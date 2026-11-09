@@ -1,0 +1,7 @@
+# Wokwi Libraries Configuration
+bogde/HX711
+paulstoffregen/OneWire
+milesburton/DallasTemperature
+ESP32Servo
+PubSubClient
+ArduinoJson
