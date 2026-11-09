@@ -13,16 +13,16 @@
 #define TOPIC_STATUS    "phy3640/quang/coffee/status"
 #define TELEMETRY_PERIOD_MS 250
 
-// ---- Chân GPIO ----
+// ---- Chân GPIO (ESP32-S3) ----
 #define PIN_HX711_DT   16
 #define PIN_HX711_SCK  17
 #define PIN_DS18B20     4
-#define PIN_PUMP       25   // PWM -> MOSFET -> bơm
-#define PIN_SERVO      26
-#define PIN_BUZZER     27
-#define PIN_LED         2
-#define PIN_BTN_TARE   32   // nút Tare (nối GND, INPUT_PULLUP)
-#define PIN_BTN_STOP   33   // nút dừng khẩn cấp (nối GND, INPUT_PULLUP)
+#define PIN_PUMP        6   // PWM -> MOSFET -> bơm
+#define PIN_SERVO       5   // PWM -> Servo đảo vòi
+#define PIN_BUZZER      7   // Còi Buzzer báo hiệu
+#define PIN_LED        15   // LED chỉ báo trạng thái
+#define PIN_BTN_TARE    1   // nút Tare (nối GND, INPUT_PULLUP)
+#define PIN_BTN_STOP    2   // nút dừng khẩn cấp (nối GND, INPUT_PULLUP)
 
 // ---- Loadcell ----
 // Wokwi: ~420.0983. Với loadcell thật: hiệu chuẩn bằng vật chuẩn (xem README mục Hiệu chuẩn).

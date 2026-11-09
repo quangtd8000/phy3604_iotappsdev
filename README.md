@@ -1,7 +1,7 @@
 # PHY3640 - IoT Gravimetric Coffee Brewer
 **Hệ thống Pha Cà Phê Phin & Pour-Over Tự Động Kiểm Soát Theo Trọng Lượng Thực Tế**
 
-> Đồ án cuối kỳ môn **PHY3640 – IoT Apps Dev (Fall 2026)** · ESP32 · PlatformIO/Arduino · MQTT · Node-RED Dashboard · Wokwi
+> Đồ án cuối kỳ môn **PHY3640 – IoT Apps Dev (Fall 2026)** · ESP32-S3 · PlatformIO/Arduino · MQTT · Node-RED Dashboard · Wokwi
 
 ---
 
@@ -14,12 +14,12 @@ Trong quá trình học tập và làm việc kỹ thuật vào ban đêm, việ
 
 ### Tính sáng tạo & Cảm hứng từ Hackaday
 Lấy cảm hứng từ các cân cà phê thông minh đắt đỏ (như Acaia Lunar) và các dự án máy pha tự động mã nguồn mở trên **Hackaday.io**, dự án này xây dựng một **hệ thống điều khiển vòng kín theo trọng lượng (Closed-Loop Gravimetric Control)**:
-- Thay vì đếm giây mù quáng, **ESP32** đọc khối lượng nước thực tế chảy vào phin/cốc theo thời gian thực qua cảm biến lực **Loadcell + HX711** để tính **tốc độ dòng chảy tức thời ($\text{Flow Rate} = \Delta m / \Delta t$, đơn vị $\text{g/s}$)**.
+- Thay vì đếm giây mù quáng, **ESP32-S3** đọc khối lượng nước thực tế chảy vào phin/cốc theo thời gian thực qua cảm biến lực **Loadcell + HX711** để tính **tốc độ dòng chảy tức thời ($\text{Flow Rate} = \Delta m / \Delta t$, đơn vị $\text{g/s}$)**.
 - Tự động điều chỉnh xung **PWM cho bơm nhu động/bơm mini** và góc quét của **động cơ Servo** để phân bổ nước đều trên bề mặt bột cà phê.
 - Đồng bộ toàn bộ **Đường cong chiết xuất (Extraction Curve)** lên **Node-RED Dashboard** qua giao thức **MQTT**, cho phép chọn công thức pha (Phin truyền thống / V60 Pour-Over) và kích hoạt pha từ điện thoại thông minh.
 
 ### Bài toán vật lý
-- **Loadcell (strain gauge) + cầu Wheatstone:** lực làm thanh nhôm biến dạng → điện trở strain gauge thay đổi → cầu Wheatstone cho ra điện áp vi sai cỡ mV → **HX711** (ADC 24-bit, khuếch đại PGA 128) → ESP32.
+- **Loadcell (strain gauge) + cầu Wheatstone:** lực làm thanh nhôm biến dạng → điện trở strain gauge thay đổi → cầu Wheatstone cho ra điện áp vi sai cỡ mV → **HX711** (ADC 24-bit, khuếch đại PGA 128) → ESP32-S3.
 - **Lưu lượng khối lượng:** $\dot m = \dfrac{m(t) - m(t-\Delta t)}{\Delta t}$ (g/s), tính trên cửa sổ trượt 6 mẫu (~1 s) sau bộ lọc EMA.
 - **Điều khiển vòng kín:** bộ điều khiển P điều chỉnh duty PWM của bơm để lưu lượng bám theo giá trị đặt $2.5\ \text{g/s}$, giảm tốc khi còn < 15 g để dừng chính xác tại khối lượng mục tiêu.
 - **Nhiệt độ:** DS18B20 giám sát nước trong khoảng $88^\circ\text{C} - 94^\circ\text{C}$.
@@ -52,13 +52,13 @@ graph TB
     end
 
     subgraph "Khối Xử Lý Trung Tâm (Controller)"
-        ESP[ESP32 Dev Board<br/>Firmware: PlatformIO / Arduino Framework<br/>State Machine + Digital Filter + MQTT Client]
+        ESP[ESP32-S3 DevKitC-1<br/>Firmware: PlatformIO / Arduino Framework<br/>State Machine + Digital Filter + MQTT Client]
     end
 
     subgraph "Khối Thực Thi (Actuators)"
         PUMP[Bơm nước Mini 5V-12V<br/>Điều tốc PWM qua MOSFET]
         SERVO[Động cơ Servo SG90/MG90S<br/>Quét góc vòi nước đều mặt phin]
-        AUDIO[Loa Buzzer & LED RGB<br/>Báo hiệu trạng thái pha]
+        AUDIO[Loa Buzzer & LED trạng thái<br/>Báo hiệu trạng thái pha]
         TFT[Màn hình hiển thị tại chỗ<br/>Hiển thị Gram, Nhiệt độ, Timer]
     end
 
@@ -103,16 +103,16 @@ stateDiagram-v2
 
 ## 4. Danh sách phần cứng & Sơ đồ kết nối (Hardware & Pinout)
 
-| Thành phần | Linh kiện cụ thể | Chân kết nối ESP32 (Dự kiến) | Vai trò trong hệ thống |
+| Thành phần | Linh kiện cụ thể | Chân kết nối ESP32-S3 | Vai trò trong hệ thống |
 | :--- | :--- | :--- | :--- |
-| **Vi điều khiển** | ESP32 DevKit V1 / ESP32-C3 | — | Xử lý thuật toán cân, State Machine và kết nối Wi-Fi/MQTT |
+| **Vi điều khiển** | ESP32-S3 DevKitC-1 (Xtensa dual-core LX7 240MHz) | — | Xử lý thuật toán cân, State Machine và kết nối Wi-Fi/MQTT |
 | **Cảm biến trọng lượng** | Loadcell 1kg + Module HX711 | `GPIO 16` (DT), `GPIO 17` (SCK) | Đo khối lượng nước (độ phân giải 0.1g) và tính tốc độ chảy |
 | **Cảm biến nhiệt độ** | DS18B20 (Đầu dò chống nước) | `GPIO 4` (1-Wire, trở kéo 4.7kΩ) | Kiểm tra nhiệt độ nước trước và trong khi pha |
-| **Cơ cấu bơm** | Bơm nước mini DC + Module MOSFET | `GPIO 25` (PWM) | Bơm nước định lượng theo chu trình ủ và chiết xuất |
-| **Cơ cấu đảo vòi** | Động cơ Servo MG90S | `GPIO 26` (PWM) | Xoay vòi nước phân bổ đều lên bề mặt bột cà phê |
-| **Âm thanh & Đèn** | Buzzer + LED trạng thái | `GPIO 27` (Buzzer), `GPIO 2` (LED) | Phát âm báo khi hoàn tất giai đoạn ủ và khi pha xong |
-| **Nút nhấn** | 2 nút nhấn (nối GND, `INPUT_PULLUP`) | `GPIO 32` (Tare), `GPIO 33` (Stop) | Trừ bì thủ công / dừng khẩn cấp |
-| **Hiển thị tại chỗ** | Màn hình TFT 128x128 / OLED | Cụm chân SPI / I2C | Hiển thị khối lượng, thời gian và trạng thái ngay trên máy *(mở rộng)* |
+| **Cơ cấu bơm** | Bơm nước mini DC + Module MOSFET | `GPIO 6` (PWM 1kHz) | Bơm nước định lượng theo chu trình ủ và chiết xuất |
+| **Cơ cấu đảo vòi** | Động cơ Servo MG90S | `GPIO 5` (PWM 50Hz) | Xoay vòi nước phân bổ đều lên bề mặt bột cà phê |
+| **Âm thanh & Đèn** | Buzzer + LED trạng thái | `GPIO 7` (Buzzer), `GPIO 15` (LED) | Phát âm báo khi hoàn tất giai đoạn ủ và khi pha xong |
+| **Nút nhấn vật lý** | 2 nút nhấn (nối GND, `INPUT_PULLUP`) | `GPIO 1` (Tare), `GPIO 2` (Stop) | Trừ bì thủ công / dừng khẩn cấp |
+| **Hiển thị tại chỗ** | Màn hình TFT 128x128 / OLED | `GPIO 8` (SDA), `GPIO 9` (SCL) | Hiển thị khối lượng, thời gian và trạng thái ngay trên máy *(mở rộng I2C/SPI)* |
 | **Khung cơ khí** | Vỏ & Giá đỡ in 3D (PLA/PETG) | — | Cách nhiệt bàn cân Loadcell và cố định trục vòi Servo |
 
 ![Wiring diagram](assets/wiring_diagram.svg)
@@ -129,7 +129,7 @@ stateDiagram-v2
 ## 5. Thiết kế Giao thức MQTT (MQTT Topic Architecture)
 
 - **MQTT Broker:** `broker.hivemq.com` (hoặc EMQX Cloud cá nhân), Port `1883` (TCP) / `8883` (TLS).
-- **Topic Publish (ESP32 gửi dữ liệu lên Node-RED mỗi 250ms khi đang pha):**
+- **Topic Publish (ESP32-S3 gửi dữ liệu lên Node-RED mỗi 250ms khi đang pha):**
   - Topic: `phy3640/quang/coffee/telemetry`
   ```json
   {
@@ -143,7 +143,7 @@ stateDiagram-v2
   }
   ```
   *(Firmware gửi thêm các trường `recipe`, `temp_ok`, `pump_duty`, `message`.)*
-- **Topic Subscribe (Node-RED gửi lệnh cấu hình và điều khiển xuống ESP32):**
+- **Topic Subscribe (Node-RED gửi lệnh cấu hình và điều khiển xuống ESP32-S3):**
   - Topic: `phy3640/quang/coffee/command`
   ```json
   {
@@ -160,22 +160,14 @@ stateDiagram-v2
 
 ---
 
-## 6. Kế hoạch thực hiện (Implementation Roadmap)
-
-- **Tuần 1–2:** Hoàn thiện đề cương, dựng mạch mô phỏng trên **Wokwi** (ESP32 + HX711 + DS18B20 + Servo + LED PWM) và thiết kế giao diện **Node-RED Dashboard**.
-- **Tuần 3–4:** Thiết kế và in 3D khung bàn cân cách nước/cách nhiệt cùng tay đỡ vòi rót; lắp ráp phần cứng thực tế.
-- **Tuần 5–6:** Hiệu chuẩn hệ số `calibration_factor` cho Loadcell, tinh chỉnh bộ lọc trung bình trượt (Moving Average / Kalman) chống nhiễu rung khi nước chảy và hoàn thiện báo cáo cuối kỳ.
-
----
-
-## 7. Cấu trúc repo & Cách chạy thử
+## 6. Cấu trúc repo & Cách chạy thử
 
 ```
-├── platformio.ini          # PlatformIO (ESP32 + thư viện)
-├── include/config.h        # Chân GPIO, Wi-Fi, MQTT, thông số điều khiển
+├── platformio.ini          # PlatformIO (ESP32-S3 DevKitC-1 + thư viện)
+├── include/config.h        # Cấu hình GPIO (ESP32-S3), Wi-Fi, MQTT
 ├── src/main.cpp            # Firmware: state machine, EMA, flow rate, MQTT
-├── diagram.json            # Sơ đồ mạch Wokwi
-├── wokwi.toml              # Cấu hình Wokwi (VS Code / CLI)
+├── diagram.json            # Sơ đồ mạch Wokwi (board-esp32-s3-devkitc-1)
+├── wokwi.toml              # Cấu hình nạp firmware Wokwi
 ├── nodered/flows.json      # Flow Node-RED + Dashboard
 └── assets/                 # Sơ đồ đấu dây, ảnh phần cứng, ảnh Wokwi
 ```
@@ -192,15 +184,15 @@ stateDiagram-v2
 
 ---
 
-## 8. Ba mẹo kỹ thuật áp dụng trong dự án
+## 7. Ba mẹo kỹ thuật áp dụng trong dự án
 
-1. **Mô phỏng 100% trên Wokwi trước khi ráp mạch thật** – ESP32, HX711 (có thanh trượt chỉnh gram), DS18B20, Servo, Buzzer đều có sẵn.
+1. **Mô phỏng 100% trên Wokwi trước khi ráp mạch thật** – ESP32-S3, HX711 (có thanh trượt chỉnh gram), DS18B20, Servo, Buzzer đều có sẵn.
 2. **Chống nhiễu Loadcell khi nước rơi:** firmware dùng bộ lọc **EMA** (`EMA_ALPHA = 0.3`) kết hợp cửa sổ trượt 6 mẫu để lấy đạo hàm lưu lượng $\dot m = \frac{m(t)-m(t-\Delta t)}{\Delta t}$, giúp đường cong trên Node-RED mượt như cân thương mại.
 3. **Khung in 3D trên Anycubic Kobra 2 Neo – chống trôi điểm 0 do nhiệt (thermal drift):** thêm tấm đế cách nhiệt (PETG/PLA) có khe thoáng khí khoảng 5 mm giữa đáy cốc và bề mặt bắt vít của Loadcell, tránh cốc nóng truyền nhiệt trực tiếp vào thanh nhôm.
 
 ---
 
-## 9. Tài liệu tham khảo (References)
+## 8. Tài liệu tham khảo (References)
 
 1. [Hackaday.io – Open Source IoT Pour-Over Coffee Machines & Smart Scales](https://hackaday.com/?s=pour+over+coffee)
 2. Avia Semiconductor, *HX711 24-Bit Analog-to-Digital Converter (ADC) for Weigh Scales Datasheet*.

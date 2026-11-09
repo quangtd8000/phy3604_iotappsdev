@@ -1,6 +1,6 @@
 /*
- * PHY3640 - IoT Gravimetric Coffee Brewer
- * ESP32 + HX711 loadcell + DS18B20 + bơm PWM + servo + buzzer, giao tiếp MQTT.
+ * PHY3640 - IoT Gravimetric Coffee Brewer (ESP32-S3)
+ * ESP32-S3 + HX711 loadcell + DS18B20 + bơm PWM + servo + buzzer, giao tiếp MQTT.
  *
  * Điều khiển vòng kín theo khối lượng:
  *   IDLE -> TARING -> BLOOM_POUR -> BLOOM_REST -> POURING -> DRAWDOWN -> DONE
@@ -372,7 +372,7 @@ void setup() {
   mqtt.setBufferSize(512);
 
   beep(2);
-  Serial.println("PHY3640 IoT Gravimetric Coffee Brewer - ready");
+  Serial.println("PHY3640 IoT Gravimetric Coffee Brewer (ESP32-S3) - ready");
 }
 
 void loop() {
