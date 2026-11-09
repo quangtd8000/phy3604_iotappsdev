@@ -1,0 +1,36 @@
+[
+  { "id": "tab1", "type": "tab", "label": "Coffee Brewer", "disabled": false, "info": "PHY3640 - IoT Gravimetric Coffee Brewer" },
+
+  { "id": "broker", "type": "mqtt-broker", "name": "HiveMQ", "broker": "broker.hivemq.com", "port": "1883", "clientid": "", "autoConnect": true, "usetls": false, "protocolVersion": "4", "keepalive": "60", "cleansession": true },
+
+  { "id": "ui_tab", "type": "ui_tab", "name": "Coffee Brewer", "icon": "local_cafe", "order": 1, "disabled": false, "hidden": false },
+  { "id": "ui_g_ctl", "type": "ui_group", "name": "Dieu khien", "tab": "ui_tab", "order": 1, "disp": true, "width": "6", "collapse": false },
+  { "id": "ui_g_stat", "type": "ui_group", "name": "Trang thai", "tab": "ui_tab", "order": 2, "disp": true, "width": "6", "collapse": false },
+  { "id": "ui_g_chart", "type": "ui_group", "name": "Extraction Curve", "tab": "ui_tab", "order": 3, "disp": true, "width": "12", "collapse": false },
+
+  { "id": "mqttIn", "type": "mqtt in", "z": "tab1", "name": "telemetry", "topic": "phy3640/quang/coffee/telemetry", "qos": "0", "datatype": "auto-detect", "broker": "broker", "x": 120, "y": 120, "wires": [["fnSplit"]] },
+  { "id": "fnSplit", "type": "function", "z": "tab1", "name": "Split telemetry", "func": "const d = msg.payload;\nif (typeof d !== 'object') return null;\nconst warn = (d.temp_ok === false) ? '  [WARN: nuoc ngoai 88-94C]' : '';\nreturn [\n  { payload: d.weight_g, topic: 'Weight (g)' },\n  { payload: d.flow_rate_gps, topic: 'Flow (g/s)' },\n  { payload: d.water_temp_c },\n  { payload: d.state + ' | ' + d.recipe + ' | ' + d.elapsed_s + 's' + warn },\n  { payload: d.message },\n  { payload: d.weight_g }\n];", "outputs": 6, "x": 330, "y": 120, "wires": [["chWeight"], ["chFlow"], ["gTemp"], ["txState"], ["txMsg"], ["gWeight"]] },
+
+  { "id": "chWeight", "type": "ui_chart", "z": "tab1", "group": "ui_g_chart", "order": 1, "width": "12", "height": "5", "label": "Tong khoi luong (g)", "chartType": "line", "legend": "false", "xformat": "HH:mm:ss", "interpolate": "linear", "nodata": "Cho du lieu...", "dot": false, "ymin": "0", "ymax": "350", "removeOlder": "10", "removeOlderPoints": "", "removeOlderUnit": "60", "cutout": 0, "useOneColor": false, "useUTC": false, "colors": ["#795548", "#aec7e8", "#ff7f0e", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5"], "outputs": 1, "useDifferentColor": false, "x": 560, "y": 60, "wires": [[]] },
+  { "id": "chFlow", "type": "ui_chart", "z": "tab1", "group": "ui_g_chart", "order": 2, "width": "12", "height": "5", "label": "Toc do rot (g/s)", "chartType": "line", "legend": "false", "xformat": "HH:mm:ss", "interpolate": "bezier", "nodata": "Cho du lieu...", "dot": false, "ymin": "0", "ymax": "6", "removeOlder": "10", "removeOlderPoints": "", "removeOlderUnit": "60", "cutout": 0, "useOneColor": false, "colors": ["#2196f3", "#aec7e8", "#ff7f0e", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5"], "outputs": 1, "useDifferentColor": false, "x": 560, "y": 100, "wires": [[]] },
+  { "id": "gTemp", "type": "ui_gauge", "z": "tab1", "name": "", "group": "ui_g_stat", "order": 1, "width": "3", "height": "3", "gtype": "gage", "title": "Nhiet do nuoc", "label": "C", "format": "{{value}}", "min": 0, "max": 100, "colors": ["#2196f3", "#4caf50", "#e53935"], "seg1": "88", "seg2": "94", "x": 560, "y": 140, "wires": [] },
+  { "id": "gWeight", "type": "ui_gauge", "z": "tab1", "name": "", "group": "ui_g_stat", "order": 2, "width": "3", "height": "3", "gtype": "gage", "title": "Khoi luong", "label": "g", "format": "{{value}}", "min": 0, "max": 350, "colors": ["#00b500", "#e6e600", "#ca3838"], "seg1": "", "seg2": "", "x": 560, "y": 180, "wires": [] },
+  { "id": "txState", "type": "ui_text", "z": "tab1", "group": "ui_g_stat", "order": 3, "width": "6", "height": "1", "name": "", "label": "State", "format": "{{msg.payload}}", "layout": "row-spread", "x": 560, "y": 220, "wires": [] },
+  { "id": "txMsg", "type": "ui_text", "z": "tab1", "group": "ui_g_stat", "order": 4, "width": "6", "height": "1", "name": "", "label": "Message", "format": "{{msg.payload}}", "layout": "row-spread", "x": 560, "y": 260, "wires": [] },
+
+  { "id": "ddRecipe", "type": "ui_dropdown", "z": "tab1", "name": "", "label": "Cong thuc", "tooltip": "", "place": "Chon cong thuc", "group": "ui_g_ctl", "order": 1, "width": "6", "height": "1", "passthru": true, "multiple": false, "options": [
+      { "label": "Vietnamese Phin 1:10", "value": "phin", "type": "str" },
+      { "label": "Classic Pour-Over 1:15", "value": "pourover", "type": "str" },
+      { "label": "Strong Night-Shift 1:12", "value": "night", "type": "str" }
+    ], "payload": "", "topic": "recipe", "topicType": "str", "x": 130, "y": 300, "wires": [["fnRecipe"]] },
+  { "id": "fnRecipe", "type": "function", "z": "tab1", "name": "Store recipe", "func": "flow.set('recipe', msg.payload);\nreturn null;", "outputs": 1, "x": 330, "y": 300, "wires": [[]] },
+
+  { "id": "btnStart", "type": "ui_button", "z": "tab1", "name": "", "group": "ui_g_ctl", "order": 2, "width": "2", "height": "1", "label": "START", "tooltip": "", "color": "white", "bgcolor": "green", "payload": "START", "payloadType": "str", "topic": "cmd", "topicType": "str", "x": 120, "y": 360, "wires": [["fnStart"]] },
+  { "id": "btnStop", "type": "ui_button", "z": "tab1", "name": "", "group": "ui_g_ctl", "order": 3, "width": "2", "height": "1", "label": "STOP", "tooltip": "", "color": "white", "bgcolor": "red", "payload": "STOP", "payloadType": "str", "topic": "cmd", "topicType": "str", "x": 120, "y": 400, "wires": [["fnStop"]] },
+  { "id": "btnTare", "type": "ui_button", "z": "tab1", "name": "", "group": "ui_g_ctl", "order": 4, "width": "2", "height": "1", "label": "TARE", "tooltip": "", "color": "white", "bgcolor": "#607d8b", "payload": "TARE", "payloadType": "str", "topic": "cmd", "topicType": "str", "x": 120, "y": 440, "wires": [["fnTare"]] },
+
+  { "id": "fnStart", "type": "function", "z": "tab1", "name": "Build START_BREW", "func": "const recipes = {\n  phin:     { recipe_name: 'Phin_Viet_1_10',   coffee_dose_g: 20.0, ratio: 10, bloom_water_g: 40.0, bloom_time_s: 35 },\n  pourover: { recipe_name: 'Classic_PourOver', coffee_dose_g: 15.0, ratio: 15, bloom_water_g: 30.0, bloom_time_s: 35 },\n  night:    { recipe_name: 'Strong_Night_1_12', coffee_dose_g: 20.0, ratio: 12, bloom_water_g: 40.0, bloom_time_s: 40 }\n};\nconst key = flow.get('recipe') || 'pourover';\nmsg.payload = Object.assign({ action: 'START_BREW' }, recipes[key]);\nreturn msg;", "outputs": 1, "x": 340, "y": 360, "wires": [["mqttOut"]] },
+  { "id": "fnStop", "type": "function", "z": "tab1", "name": "STOP", "func": "msg.payload = { action: 'STOP' };\nreturn msg;", "outputs": 1, "x": 330, "y": 400, "wires": [["mqttOut"]] },
+  { "id": "fnTare", "type": "function", "z": "tab1", "name": "TARE", "func": "msg.payload = { action: 'TARE' };\nreturn msg;", "outputs": 1, "x": 330, "y": 440, "wires": [["mqttOut"]] },
+  { "id": "mqttOut", "type": "mqtt out", "z": "tab1", "name": "command", "topic": "phy3640/quang/coffee/command", "qos": "0", "retain": "false", "broker": "broker", "x": 560, "y": 400, "wires": [] }
+]

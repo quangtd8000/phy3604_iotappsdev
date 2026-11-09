@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="Segoe UI, Arial, sans-serif" font-size="14">
+  <rect width="900" height="560" fill="#fafafa"/>
+  <text x="450" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">Wiring diagram - IoT Gravimetric Coffee Brewer</text>
+
+  <!-- ESP32 -->
+  <rect x="340" y="70" width="220" height="420" rx="12" fill="#263238"/>
+  <text x="450" y="105" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">ESP32 DevKit V1</text>
+  <g fill="#cfd8dc">
+    <text x="352" y="150">GPIO16</text><text x="352" y="190">GPIO17</text><text x="352" y="230">3V3</text>
+    <text x="352" y="270">GND</text><text x="352" y="310">GPIO4</text><text x="352" y="350">GPIO32</text><text x="352" y="390">GPIO33</text>
+    <text x="548" y="150" text-anchor="end">GPIO25</text><text x="548" y="190" text-anchor="end">GPIO26</text>
+    <text x="548" y="230" text-anchor="end">GPIO27</text><text x="548" y="270" text-anchor="end">GPIO2</text>
+    <text x="548" y="310" text-anchor="end">5V (VIN)</text><text x="548" y="350" text-anchor="end">GND</text>
+  </g>
+
+  <!-- Left side -->
+  <rect x="30" y="120" width="210" height="110" rx="8" fill="#ffe0b2" stroke="#e65100"/>
+  <text x="135" y="145" text-anchor="middle" font-weight="bold">Loadcell 1kg + HX711</text>
+  <text x="135" y="170" text-anchor="middle">DT  -&gt; GPIO16</text>
+  <text x="135" y="190" text-anchor="middle">SCK -&gt; GPIO17</text>
+  <text x="135" y="210" text-anchor="middle">VCC -&gt; 3V3 | GND -&gt; GND</text>
+  <line x1="240" y1="146" x2="340" y2="146" stroke="#e65100" stroke-width="2"/>
+  <line x1="240" y1="186" x2="340" y2="186" stroke="#e65100" stroke-width="2"/>
+
+  <rect x="30" y="270" width="210" height="95" rx="8" fill="#c8e6c9" stroke="#2e7d32"/>
+  <text x="135" y="295" text-anchor="middle" font-weight="bold">DS18B20 (waterproof probe)</text>
+  <text x="135" y="320" text-anchor="middle">DQ -&gt; GPIO4 (+ 4.7k pull-up to 3V3)</text>
+  <text x="135" y="340" text-anchor="middle">VCC -&gt; 3V3 | GND -&gt; GND</text>
+  <line x1="240" y1="306" x2="340" y2="306" stroke="#2e7d32" stroke-width="2"/>
+
+  <rect x="30" y="395" width="210" height="95" rx="8" fill="#e1bee7" stroke="#6a1b9a"/>
+  <text x="135" y="420" text-anchor="middle" font-weight="bold">Buttons (to GND)</text>
+  <text x="135" y="445" text-anchor="middle">TARE -&gt; GPIO32</text>
+  <text x="135" y="465" text-anchor="middle">STOP -&gt; GPIO33</text>
+  <line x1="240" y1="446" x2="300" y2="446" stroke="#6a1b9a" stroke-width="2"/>
+  <line x1="300" y1="446" x2="300" y2="346" stroke="#6a1b9a" stroke-width="2"/>
+  <line x1="300" y1="346" x2="340" y2="346" stroke="#6a1b9a" stroke-width="2"/>
+  <line x1="240" y1="466" x2="320" y2="466" stroke="#6a1b9a" stroke-width="2"/>
+  <line x1="320" y1="466" x2="320" y2="386" stroke="#6a1b9a" stroke-width="2"/>
+  <line x1="320" y1="386" x2="340" y2="386" stroke="#6a1b9a" stroke-width="2"/>
+
+  <!-- Right side -->
+  <rect x="660" y="110" width="210" height="110" rx="8" fill="#bbdefb" stroke="#1565c0"/>
+  <text x="765" y="135" text-anchor="middle" font-weight="bold">Mini pump + MOSFET</text>
+  <text x="765" y="160" text-anchor="middle">Gate -&gt; GPIO25 (PWM 1 kHz)</text>
+  <text x="765" y="180" text-anchor="middle">Flyback diode across pump</text>
+  <text x="765" y="200" text-anchor="middle">Pump supply: external 5-12V</text>
+  <line x1="560" y1="146" x2="660" y2="146" stroke="#1565c0" stroke-width="2"/>
+
+  <rect x="660" y="240" width="210" height="90" rx="8" fill="#ffcdd2" stroke="#b71c1c"/>
+  <text x="765" y="265" text-anchor="middle" font-weight="bold">Servo MG90S</text>
+  <text x="765" y="290" text-anchor="middle">PWM -&gt; GPIO26 (50 Hz)</text>
+  <text x="765" y="310" text-anchor="middle">V+ -&gt; 5V | GND -&gt; GND</text>
+  <line x1="560" y1="186" x2="620" y2="186" stroke="#b71c1c" stroke-width="2"/>
+  <line x1="620" y1="186" x2="620" y2="270" stroke="#b71c1c" stroke-width="2"/>
+  <line x1="620" y1="270" x2="660" y2="270" stroke="#b71c1c" stroke-width="2"/>
+
+  <rect x="660" y="350" width="210" height="80" rx="8" fill="#fff9c4" stroke="#f9a825"/>
+  <text x="765" y="375" text-anchor="middle" font-weight="bold">Buzzer + status LED</text>
+  <text x="765" y="400" text-anchor="middle">Buzzer -&gt; GPIO27</text>
+  <text x="765" y="418" text-anchor="middle">LED -&gt; GPIO2 (via 220 ohm)</text>
+  <line x1="560" y1="226" x2="600" y2="226" stroke="#f9a825" stroke-width="2"/>
+  <line x1="600" y1="226" x2="600" y2="380" stroke="#f9a825" stroke-width="2"/>
+  <line x1="600" y1="380" x2="660" y2="380" stroke="#f9a825" stroke-width="2"/>
+
+  <text x="450" y="530" text-anchor="middle" fill="#666">Common ground for all modules. Power the pump from a separate supply, tie its GND to ESP32 GND.</text>
+</svg>

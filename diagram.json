@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "author": "PHY3640 - IoT Gravimetric Coffee Brewer",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-hx711", "id": "cell", "top": -150, "left": 200, "attrs": { "type": "5kg" } },
+    { "type": "wokwi-ds18b20", "id": "temp", "top": -140, "left": -140, "attrs": {} },
+    { "type": "wokwi-resistor", "id": "r1", "top": -60, "left": -130, "attrs": { "value": "4700" } },
+    { "type": "wokwi-servo", "id": "servo", "top": 140, "left": 220, "attrs": {} },
+    { "type": "wokwi-buzzer", "id": "bz", "top": 210, "left": -130, "attrs": { "volume": "0.1" } },
+    { "type": "wokwi-led", "id": "ledPump", "top": 230, "left": 60, "attrs": { "color": "blue", "label": "PUMP" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 290, "left": 40, "attrs": { "value": "220" } },
+    { "type": "wokwi-pushbutton", "id": "btnTare", "top": 100, "left": -150, "attrs": { "color": "green", "label": "TARE" } },
+    { "type": "wokwi-pushbutton", "id": "btnStop", "top": 160, "left": -150, "attrs": { "color": "red", "label": "STOP" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "cell:VCC", "esp:3V3", "red", [ "h0" ] ],
+    [ "cell:GND", "esp:GND.2", "black", [ "h0" ] ],
+    [ "cell:DT", "esp:16", "green", [ "h0" ] ],
+    [ "cell:SCK", "esp:17", "orange", [ "h0" ] ],
+
+    [ "temp:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "temp:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "temp:DQ", "esp:4", "yellow", [ "v0" ] ],
+    [ "r1:1", "temp:VCC", "red", [ "v0" ] ],
+    [ "r1:2", "temp:DQ", "yellow", [ "v0" ] ],
+
+    [ "servo:V+", "esp:5V", "red", [ "h0" ] ],
+    [ "servo:GND", "esp:GND.2", "black", [ "h0" ] ],
+    [ "servo:PWM", "esp:26", "blue", [ "h0" ] ],
+
+    [ "bz:1", "esp:GND.1", "black", [ "v0" ] ],
+    [ "bz:2", "esp:27", "purple", [ "v0" ] ],
+
+    [ "ledPump:A", "r2:2", "blue", [ "v0" ] ],
+    [ "r2:1", "esp:25", "blue", [ "v0" ] ],
+    [ "ledPump:C", "esp:GND.1", "black", [ "v0" ] ],
+
+    [ "btnTare:1.l", "esp:32", "green", [ "h0" ] ],
+    [ "btnTare:2.l", "esp:GND.1", "black", [ "h0" ] ],
+    [ "btnStop:1.l", "esp:33", "red", [ "h0" ] ],
+    [ "btnStop:2.l", "esp:GND.1", "black", [ "h0" ] ]
+  ],
+  "dependencies": {}
+}

@@ -1,0 +1,390 @@
+/*
+ * PHY3640 - IoT Gravimetric Coffee Brewer
+ * ESP32 + HX711 loadcell + DS18B20 + bơm PWM + servo + buzzer, giao tiếp MQTT.
+ *
+ * Điều khiển vòng kín theo khối lượng:
+ *   IDLE -> TARING -> BLOOM_POUR -> BLOOM_REST -> POURING -> DRAWDOWN -> DONE
+ *   (ERROR khi không có dòng chảy / quá khối lượng; ABORT bằng lệnh STOP hoặc nút dừng)
+ */
+#include <Arduino.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <HX711.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <ESP32Servo.h>
+#include "config.h"
+
+// ===================== Trạng thái =====================
+enum State { ST_IDLE, ST_TARING, ST_BLOOM_POUR, ST_BLOOM_REST, ST_POURING, ST_DRAWDOWN, ST_DONE, ST_ERROR };
+static const char* STATE_NAMES[] = {"IDLE", "TARING", "BLOOM_POUR", "BLOOM_REST", "POURING", "DRAWDOWN", "DONE", "ERROR"};
+
+struct Recipe {
+  String name = "Classic_PourOver";
+  float doseG = 15.0f;
+  float ratio = 15.0f;
+  float bloomG = 30.0f;
+  uint32_t bloomS = 35;
+  float targetG() const { return doseG * ratio; }
+} recipe;
+
+// ===================== Đối tượng phần cứng =====================
+WiFiClient wifiClient;
+PubSubClient mqtt(wifiClient);
+HX711 scale;
+OneWire oneWire(PIN_DS18B20);
+DallasTemperature ds18(&oneWire);
+Servo nozzleServo;
+ESP32PWM pumpPwm;
+
+// ===================== Biến toàn cục =====================
+State state = ST_IDLE;
+String lastMessage = "Ready";
+
+float weightG = 0, weightEma = 0, flowGps = 0;
+float waterTempC = NAN;
+int pumpDuty = 0;
+int servoAngle = (SERVO_MIN_DEG + SERVO_MAX_DEG) / 2;
+int servoDir = 1;
+
+uint32_t brewStartMs = 0, stateStartMs = 0;
+uint32_t lastProgressMs = 0;
+float lastProgressG = 0;
+uint32_t stableSinceMs = 0;
+
+// Bộ đệm vòng để tính lưu lượng = (m(t) - m(t-Δt)) / Δt
+float histW[FLOW_WINDOW];
+uint32_t histT[FLOW_WINDOW];
+uint8_t histCount = 0, histHead = 0;
+
+// Buzzer không chặn
+int beepToggles = 0;
+uint32_t lastBeepMs = 0;
+
+// ===================== Tiện ích =====================
+void beep(int n) { beepToggles = n * 2; }
+
+void updateBeep() {
+  if (beepToggles > 0 && millis() - lastBeepMs >= 120) {
+    lastBeepMs = millis();
+    digitalWrite(PIN_BUZZER, beepToggles % 2 == 0 ? HIGH : LOW);
+    beepToggles--;
+    if (beepToggles == 0) digitalWrite(PIN_BUZZER, LOW);
+  }
+}
+
+void setPump(int duty) {
+  pumpDuty = constrain(duty, 0, PUMP_DUTY_MAX);
+  pumpPwm.write(pumpDuty);
+  digitalWrite(PIN_LED, pumpDuty > 0 ? HIGH : LOW);
+}
+
+void setState(State s, const char* msg = nullptr) {
+  state = s;
+  stateStartMs = millis();
+  lastProgressMs = millis();
+  lastProgressG = weightG;
+  if (msg) lastMessage = msg;
+  Serial.printf("[STATE] %s - %s\n", STATE_NAMES[s], lastMessage.c_str());
+}
+
+void resetFlowHistory() {
+  histCount = 0;
+  histHead = 0;
+  flowGps = 0;
+}
+
+void abortBrew(const char* msg) {
+  setPump(0);
+  setState(ST_IDLE, msg);
+}
+
+// ===================== Cảm biến =====================
+void readWeight() {
+  if (!scale.is_ready()) return;
+  weightG = scale.get_units(1);
+  weightEma = EMA_ALPHA * weightG + (1.0f - EMA_ALPHA) * weightEma;
+  weightG = weightEma;
+}
+
+void updateFlow() {
+  static uint32_t lastSample = 0;
+  if (millis() - lastSample < FLOW_SAMPLE_MS) return;
+  lastSample = millis();
+
+  histW[histHead] = weightG;
+  histT[histHead] = lastSample;
+  histHead = (histHead + 1) % FLOW_WINDOW;
+  if (histCount < FLOW_WINDOW) histCount++;
+  if (histCount < 2) { flowGps = 0; return; }
+
+  uint8_t oldest = (histCount < FLOW_WINDOW) ? 0 : histHead;
+  uint8_t newest = (histHead + FLOW_WINDOW - 1) % FLOW_WINDOW;
+  float dt = (histT[newest] - histT[oldest]) / 1000.0f;
+  if (dt > 0) flowGps = (histW[newest] - histW[oldest]) / dt;
+}
+
+void updateTemperature() {
+  static uint32_t lastReq = 0;
+  static bool waiting = false;
+  if (!waiting && millis() - lastReq > 1000) {
+    ds18.requestTemperatures();
+    lastReq = millis();
+    waiting = true;
+  } else if (waiting && millis() - lastReq > 800) {
+    float t = ds18.getTempCByIndex(0);
+    if (t != DEVICE_DISCONNECTED_C) waterTempC = t;
+    waiting = false;
+  }
+}
+
+// ===================== Điều khiển bơm (P-controller theo lưu lượng) =====================
+void controlPump(float remainingG) {
+  static uint32_t lastCtl = 0;
+  if (millis() - lastCtl < FLOW_SAMPLE_MS) return;
+  lastCtl = millis();
+
+  float desired = TARGET_FLOW_GPS;
+  if (remainingG < SLOWDOWN_ZONE_G) desired = max(0.8f, TARGET_FLOW_GPS * remainingG / SLOWDOWN_ZONE_G);
+  float err = desired - flowGps;
+  setPump((int)constrain(pumpDuty + FLOW_KP * err, PUMP_DUTY_MIN, PUMP_DUTY_MAX));
+}
+
+// Kiểm tra bơm chạy mà khối lượng không tăng (hết nước / lệch cốc)
+bool checkNoFlow() {
+  if (weightG - lastProgressG > 0.5f) {
+    lastProgressG = weightG;
+    lastProgressMs = millis();
+  }
+  return millis() - lastProgressMs > NO_FLOW_TIMEOUT_MS;
+}
+
+// ===================== Servo quét vòi =====================
+void sweepServo(bool active) {
+  static uint32_t last = 0;
+  if (!active || millis() - last < SERVO_STEP_MS) return;
+  last = millis();
+  servoAngle += servoDir * 2;
+  if (servoAngle >= SERVO_MAX_DEG) { servoAngle = SERVO_MAX_DEG; servoDir = -1; }
+  if (servoAngle <= SERVO_MIN_DEG) { servoAngle = SERVO_MIN_DEG; servoDir = 1; }
+  nozzleServo.write(servoAngle);
+}
+
+// ===================== State machine =====================
+void startBrew() {
+  if (state != ST_IDLE && state != ST_DONE && state != ST_ERROR) {
+    lastMessage = "Dang pha, bo qua lenh START";
+    return;
+  }
+  setPump(0);
+  scale.tare(10);
+  weightEma = 0;
+  weightG = 0;
+  resetFlowHistory();
+  brewStartMs = millis();
+  setState(ST_TARING, "Auto-tare");
+}
+
+void runStateMachine() {
+  const float target = recipe.targetG();
+  switch (state) {
+    case ST_IDLE:
+    case ST_DONE:
+    case ST_ERROR:
+      setPump(0);
+      break;
+
+    case ST_TARING:
+      if (millis() - stateStartMs > 800) {
+        resetFlowHistory();
+        setPump(PUMP_DUTY_START);
+        setState(ST_BLOOM_POUR, "Stage 1: Bloom - bom nuoc u");
+      }
+      break;
+
+    case ST_BLOOM_POUR:
+      controlPump(recipe.bloomG - weightG);
+      if (checkNoFlow()) { setPump(0); setState(ST_ERROR, "Loi: khong co dong chay"); beep(5); break; }
+      if (weightG >= recipe.bloomG - STOP_OFFSET_G) {
+        setPump(0);
+        setState(ST_BLOOM_REST, "Stage 1: Bloom - nghi thoat CO2");
+      }
+      break;
+
+    case ST_BLOOM_REST:
+      if (millis() - stateStartMs >= recipe.bloomS * 1000UL) {
+        beep(1);
+        setPump(PUMP_DUTY_START);
+        setState(ST_POURING, "Stage 2: Active extraction");
+      }
+      break;
+
+    case ST_POURING:
+      controlPump(target - weightG);
+      if (checkNoFlow()) { setPump(0); setState(ST_ERROR, "Loi: khong co dong chay"); beep(5); break; }
+      if (weightG > target + 20.0f) { setPump(0); setState(ST_ERROR, "Loi: qua khoi luong muc tieu"); beep(5); break; }
+      if (weightG >= target - STOP_OFFSET_G) {
+        setPump(0);
+        stableSinceMs = 0;
+        setState(ST_DRAWDOWN, "Stage 3: Drawdown");
+      }
+      break;
+
+    case ST_DRAWDOWN:
+      if (fabsf(flowGps) < DRAWDOWN_FLOW_GPS) {
+        if (stableSinceMs == 0) stableSinceMs = millis();
+      } else {
+        stableSinceMs = 0;
+      }
+      if ((stableSinceMs && millis() - stableSinceMs > DRAWDOWN_STABLE_MS) ||
+          millis() - stateStartMs > DRAWDOWN_TIMEOUT_MS) {
+        beep(3);
+        setState(ST_DONE, "Hoan tat! Ly ca phe da san sang");
+      }
+      break;
+  }
+  sweepServo(state == ST_BLOOM_POUR || state == ST_POURING);
+}
+
+// ===================== MQTT =====================
+void onMqtt(char* topic, byte* payload, unsigned int len) {
+  JsonDocument doc;
+  if (deserializeJson(doc, payload, len)) { Serial.println("[MQTT] JSON loi"); return; }
+  String action = doc["action"] | "";
+  Serial.printf("[MQTT] action=%s\n", action.c_str());
+
+  if (action == "START_BREW") {
+    recipe.name   = doc["recipe_name"] | "Custom";
+    recipe.doseG  = doc["coffee_dose_g"] | 15.0f;
+    recipe.ratio  = doc["ratio"] | 15.0f;
+    recipe.bloomG = doc["bloom_water_g"] | (recipe.doseG * 2.0f);
+    recipe.bloomS = doc["bloom_time_s"] | 35;
+    if (recipe.doseG <= 0 || recipe.ratio <= 0 || recipe.bloomG >= recipe.targetG()) {
+      lastMessage = "Cong thuc khong hop le";
+      return;
+    }
+    startBrew();
+  } else if (action == "STOP") {
+    abortBrew("Da dung boi nguoi dung");
+  } else if (action == "TARE") {
+    if (state == ST_IDLE || state == ST_DONE || state == ST_ERROR) {
+      scale.tare(10);
+      weightEma = 0;
+      weightG = 0;
+      lastMessage = "Tare";
+    }
+  }
+}
+
+void ensureWifi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  static uint32_t lastTry = 0;
+  if (millis() - lastTry < 5000) return;
+  lastTry = millis();
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
+void ensureMqtt() {
+  if (WiFi.status() != WL_CONNECTED || mqtt.connected()) return;
+  static uint32_t lastTry = 0;
+  if (millis() - lastTry < 3000) return;
+  lastTry = millis();
+  String cid = "phy3640-coffee-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  if (mqtt.connect(cid.c_str(), nullptr, nullptr, TOPIC_STATUS, 0, true, "offline")) {
+    mqtt.subscribe(TOPIC_COMMAND);
+    mqtt.publish(TOPIC_STATUS, "online", true);
+    Serial.println("[MQTT] connected");
+  }
+}
+
+void publishTelemetry() {
+  static uint32_t last = 0;
+  if (!mqtt.connected() || millis() - last < TELEMETRY_PERIOD_MS) return;
+  last = millis();
+
+  JsonDocument doc;
+  doc["state"] = STATE_NAMES[state];
+  doc["recipe"] = recipe.name;
+  doc["weight_g"] = roundf(weightG * 10) / 10;
+  doc["target_g"] = recipe.targetG();
+  doc["flow_rate_gps"] = roundf(max(flowGps, 0.0f) * 10) / 10;
+  if (!isnan(waterTempC)) {
+    doc["water_temp_c"] = roundf(waterTempC * 10) / 10;
+    doc["temp_ok"] = waterTempC >= TEMP_MIN_C && waterTempC <= TEMP_MAX_C;
+  }
+  bool running = state != ST_IDLE && state != ST_DONE && state != ST_ERROR;
+  doc["elapsed_s"] = running ? (millis() - brewStartMs) / 1000 : 0;
+  doc["servo_angle"] = servoAngle;
+  doc["pump_duty"] = pumpDuty;
+  doc["message"] = lastMessage;
+
+  char buf[320];
+  size_t n = serializeJson(doc, buf, sizeof(buf));
+  mqtt.publish(TOPIC_TELEMETRY, (const uint8_t*)buf, n, false);
+}
+
+// ===================== Nút nhấn =====================
+void handleButtons() {
+  static uint32_t lastTare = 0, lastStop = 0;
+  if (digitalRead(PIN_BTN_STOP) == LOW && millis() - lastStop > 300) {
+    lastStop = millis();
+    abortBrew("Dung khan cap (nut nhan)");
+  }
+  if (digitalRead(PIN_BTN_TARE) == LOW && millis() - lastTare > 300) {
+    lastTare = millis();
+    if (state == ST_IDLE || state == ST_DONE || state == ST_ERROR) {
+      scale.tare(10);
+      weightEma = 0;
+      weightG = 0;
+      lastMessage = "Tare";
+    }
+  }
+}
+
+// ===================== setup / loop =====================
+void setup() {
+  Serial.begin(115200);
+  pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(PIN_BTN_TARE, INPUT_PULLUP);
+  pinMode(PIN_BTN_STOP, INPUT_PULLUP);
+
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  nozzleServo.setPeriodHertz(50);
+  nozzleServo.attach(PIN_SERVO, 500, 2400);
+  nozzleServo.write(servoAngle);
+  pumpPwm.attachPin(PIN_PUMP, 1000, 8);
+  setPump(0);
+
+  scale.begin(PIN_HX711_DT, PIN_HX711_SCK);
+  scale.set_scale(HX711_CAL_FACTOR);
+  scale.tare(10);
+
+  ds18.begin();
+  ds18.setWaitForConversion(false);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  mqtt.setCallback(onMqtt);
+  mqtt.setBufferSize(512);
+
+  beep(2);
+  Serial.println("PHY3640 IoT Gravimetric Coffee Brewer - ready");
+}
+
+void loop() {
+  ensureWifi();
+  ensureMqtt();
+  mqtt.loop();
+
+  readWeight();
+  updateFlow();
+  updateTemperature();
+  handleButtons();
+  runStateMachine();
+  updateBeep();
+  publishTelemetry();
+}
