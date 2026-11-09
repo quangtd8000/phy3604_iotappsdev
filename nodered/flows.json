@@ -1,36 +1,567 @@
 [
-  { "id": "tab1", "type": "tab", "label": "Coffee Brewer", "disabled": false, "info": "PHY3640 - IoT Gravimetric Coffee Brewer" },
-
-  { "id": "broker", "type": "mqtt-broker", "name": "HiveMQ", "broker": "broker.hivemq.com", "port": "1883", "clientid": "", "autoConnect": true, "usetls": false, "protocolVersion": "4", "keepalive": "60", "cleansession": true },
-
-  { "id": "ui_tab", "type": "ui_tab", "name": "Coffee Brewer", "icon": "local_cafe", "order": 1, "disabled": false, "hidden": false },
-  { "id": "ui_g_ctl", "type": "ui_group", "name": "Dieu khien", "tab": "ui_tab", "order": 1, "disp": true, "width": "6", "collapse": false },
-  { "id": "ui_g_stat", "type": "ui_group", "name": "Trang thai", "tab": "ui_tab", "order": 2, "disp": true, "width": "6", "collapse": false },
-  { "id": "ui_g_chart", "type": "ui_group", "name": "Extraction Curve", "tab": "ui_tab", "order": 3, "disp": true, "width": "12", "collapse": false },
-
-  { "id": "mqttIn", "type": "mqtt in", "z": "tab1", "name": "telemetry", "topic": "phy3640/quang/coffee/telemetry", "qos": "0", "datatype": "auto-detect", "broker": "broker", "x": 120, "y": 120, "wires": [["fnSplit"]] },
-  { "id": "fnSplit", "type": "function", "z": "tab1", "name": "Split telemetry", "func": "const d = msg.payload;\nif (typeof d !== 'object') return null;\nconst warn = (d.temp_ok === false) ? '  [WARN: nuoc ngoai 88-94C]' : '';\nreturn [\n  { payload: d.weight_g, topic: 'Weight (g)' },\n  { payload: d.flow_rate_gps, topic: 'Flow (g/s)' },\n  { payload: d.water_temp_c },\n  { payload: d.state + ' | ' + d.recipe + ' | ' + d.elapsed_s + 's' + warn },\n  { payload: d.message },\n  { payload: d.weight_g }\n];", "outputs": 6, "x": 330, "y": 120, "wires": [["chWeight"], ["chFlow"], ["gTemp"], ["txState"], ["txMsg"], ["gWeight"]] },
-
-  { "id": "chWeight", "type": "ui_chart", "z": "tab1", "group": "ui_g_chart", "order": 1, "width": "12", "height": "5", "label": "Tong khoi luong (g)", "chartType": "line", "legend": "false", "xformat": "HH:mm:ss", "interpolate": "linear", "nodata": "Cho du lieu...", "dot": false, "ymin": "0", "ymax": "350", "removeOlder": "10", "removeOlderPoints": "", "removeOlderUnit": "60", "cutout": 0, "useOneColor": false, "useUTC": false, "colors": ["#795548", "#aec7e8", "#ff7f0e", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5"], "outputs": 1, "useDifferentColor": false, "x": 560, "y": 60, "wires": [[]] },
-  { "id": "chFlow", "type": "ui_chart", "z": "tab1", "group": "ui_g_chart", "order": 2, "width": "12", "height": "5", "label": "Toc do rot (g/s)", "chartType": "line", "legend": "false", "xformat": "HH:mm:ss", "interpolate": "bezier", "nodata": "Cho du lieu...", "dot": false, "ymin": "0", "ymax": "6", "removeOlder": "10", "removeOlderPoints": "", "removeOlderUnit": "60", "cutout": 0, "useOneColor": false, "colors": ["#2196f3", "#aec7e8", "#ff7f0e", "#2ca02c", "#98df8a", "#d62728", "#ff9896", "#9467bd", "#c5b0d5"], "outputs": 1, "useDifferentColor": false, "x": 560, "y": 100, "wires": [[]] },
-  { "id": "gTemp", "type": "ui_gauge", "z": "tab1", "name": "", "group": "ui_g_stat", "order": 1, "width": "3", "height": "3", "gtype": "gage", "title": "Nhiet do nuoc", "label": "C", "format": "{{value}}", "min": 0, "max": 100, "colors": ["#2196f3", "#4caf50", "#e53935"], "seg1": "88", "seg2": "94", "x": 560, "y": 140, "wires": [] },
-  { "id": "gWeight", "type": "ui_gauge", "z": "tab1", "name": "", "group": "ui_g_stat", "order": 2, "width": "3", "height": "3", "gtype": "gage", "title": "Khoi luong", "label": "g", "format": "{{value}}", "min": 0, "max": 350, "colors": ["#00b500", "#e6e600", "#ca3838"], "seg1": "", "seg2": "", "x": 560, "y": 180, "wires": [] },
-  { "id": "txState", "type": "ui_text", "z": "tab1", "group": "ui_g_stat", "order": 3, "width": "6", "height": "1", "name": "", "label": "State", "format": "{{msg.payload}}", "layout": "row-spread", "x": 560, "y": 220, "wires": [] },
-  { "id": "txMsg", "type": "ui_text", "z": "tab1", "group": "ui_g_stat", "order": 4, "width": "6", "height": "1", "name": "", "label": "Message", "format": "{{msg.payload}}", "layout": "row-spread", "x": 560, "y": 260, "wires": [] },
-
-  { "id": "ddRecipe", "type": "ui_dropdown", "z": "tab1", "name": "", "label": "Cong thuc", "tooltip": "", "place": "Chon cong thuc", "group": "ui_g_ctl", "order": 1, "width": "6", "height": "1", "passthru": true, "multiple": false, "options": [
-      { "label": "Vietnamese Phin 1:10", "value": "phin", "type": "str" },
-      { "label": "Classic Pour-Over 1:15", "value": "pourover", "type": "str" },
-      { "label": "Strong Night-Shift 1:12", "value": "night", "type": "str" }
-    ], "payload": "", "topic": "recipe", "topicType": "str", "x": 130, "y": 300, "wires": [["fnRecipe"]] },
-  { "id": "fnRecipe", "type": "function", "z": "tab1", "name": "Store recipe", "func": "flow.set('recipe', msg.payload);\nreturn null;", "outputs": 1, "x": 330, "y": 300, "wires": [[]] },
-
-  { "id": "btnStart", "type": "ui_button", "z": "tab1", "name": "", "group": "ui_g_ctl", "order": 2, "width": "2", "height": "1", "label": "START", "tooltip": "", "color": "white", "bgcolor": "green", "payload": "START", "payloadType": "str", "topic": "cmd", "topicType": "str", "x": 120, "y": 360, "wires": [["fnStart"]] },
-  { "id": "btnStop", "type": "ui_button", "z": "tab1", "name": "", "group": "ui_g_ctl", "order": 3, "width": "2", "height": "1", "label": "STOP", "tooltip": "", "color": "white", "bgcolor": "red", "payload": "STOP", "payloadType": "str", "topic": "cmd", "topicType": "str", "x": 120, "y": 400, "wires": [["fnStop"]] },
-  { "id": "btnTare", "type": "ui_button", "z": "tab1", "name": "", "group": "ui_g_ctl", "order": 4, "width": "2", "height": "1", "label": "TARE", "tooltip": "", "color": "white", "bgcolor": "#607d8b", "payload": "TARE", "payloadType": "str", "topic": "cmd", "topicType": "str", "x": 120, "y": 440, "wires": [["fnTare"]] },
-
-  { "id": "fnStart", "type": "function", "z": "tab1", "name": "Build START_BREW", "func": "const recipes = {\n  phin:     { recipe_name: 'Phin_Viet_1_10',   coffee_dose_g: 20.0, ratio: 10, bloom_water_g: 40.0, bloom_time_s: 35 },\n  pourover: { recipe_name: 'Classic_PourOver', coffee_dose_g: 15.0, ratio: 15, bloom_water_g: 30.0, bloom_time_s: 35 },\n  night:    { recipe_name: 'Strong_Night_1_12', coffee_dose_g: 20.0, ratio: 12, bloom_water_g: 40.0, bloom_time_s: 40 }\n};\nconst key = flow.get('recipe') || 'pourover';\nmsg.payload = Object.assign({ action: 'START_BREW' }, recipes[key]);\nreturn msg;", "outputs": 1, "x": 340, "y": 360, "wires": [["mqttOut"]] },
-  { "id": "fnStop", "type": "function", "z": "tab1", "name": "STOP", "func": "msg.payload = { action: 'STOP' };\nreturn msg;", "outputs": 1, "x": 330, "y": 400, "wires": [["mqttOut"]] },
-  { "id": "fnTare", "type": "function", "z": "tab1", "name": "TARE", "func": "msg.payload = { action: 'TARE' };\nreturn msg;", "outputs": 1, "x": 330, "y": 440, "wires": [["mqttOut"]] },
-  { "id": "mqttOut", "type": "mqtt out", "z": "tab1", "name": "command", "topic": "phy3640/quang/coffee/command", "qos": "0", "retain": "false", "broker": "broker", "x": 560, "y": 400, "wires": [] }
+  {
+    "id": "tab1",
+    "type": "tab",
+    "label": "Coffee Brewer",
+    "disabled": false,
+    "info": "PHY3640 - IoT Gravimetric Coffee Brewer"
+  },
+  {
+    "id": "broker",
+    "type": "mqtt-broker",
+    "name": "HiveMQ",
+    "broker": "broker.hivemq.com",
+    "port": 1883,
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true
+  },
+  {
+    "id": "ui_page_coffee",
+    "type": "ui-page",
+    "name": "Máy Pha Cà Phê",
+    "ui": "dd3bfbd23c60daf8",
+    "path": "/coffee",
+    "icon": "coffee",
+    "layout": "grid",
+    "theme": "1625fc129d6345ff",
+    "breakpoints": [
+      {
+        "name": "Default",
+        "px": "0",
+        "cols": "3"
+      },
+      {
+        "name": "Tablet",
+        "px": "576",
+        "cols": "6"
+      },
+      {
+        "name": "Small Desktop",
+        "px": "768",
+        "cols": "9"
+      },
+      {
+        "name": "Desktop",
+        "px": "1024",
+        "cols": "12"
+      }
+    ],
+    "order": 2,
+    "className": "",
+    "visible": "true",
+    "disabled": "false"
+  },
+  {
+    "id": "ui_grp_coffee_ctl",
+    "type": "ui-group",
+    "name": "Điều khiển pha",
+    "page": "ui_page_coffee",
+    "width": 4,
+    "height": 1,
+    "order": 1,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "ui_grp_coffee_stat",
+    "type": "ui-group",
+    "name": "Trạng thái & Nhiệt độ",
+    "page": "ui_page_coffee",
+    "width": 4,
+    "height": 1,
+    "order": 2,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "ui_grp_coffee_chart",
+    "type": "ui-group",
+    "name": "Đường cong chiết xuất (Extraction Curve)",
+    "page": "ui_page_coffee",
+    "width": 8,
+    "height": 1,
+    "order": 3,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  },
+  {
+    "id": "mqttIn",
+    "type": "mqtt in",
+    "z": "tab1",
+    "name": "telemetry",
+    "topic": "phy3640/quang/coffee/telemetry",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "x": 100,
+    "y": 100,
+    "wires": [
+      [
+        "fnSplit"
+      ]
+    ]
+  },
+  {
+    "id": "fnSplit",
+    "type": "function",
+    "z": "tab1",
+    "name": "Split telemetry",
+    "func": "const d = msg.payload;\nif (typeof d !== 'object' || d === null) return null;\nconst warn = (d.temp_ok === false) ? ' ⚠️ [Nước chưa đạt 88-94°C]' : ' ✅ [Nhiệt độ chuẩn]';\nreturn [\n  { payload: d.weight_g, topic: 'Khối lượng (g)' },\n  { payload: d.flow_rate_gps, topic: 'Lưu lượng (g/s)' },\n  { payload: (typeof d.water_temp_c === 'number') ? d.water_temp_c : 0 },\n  { payload: (d.state || 'IDLE') + ' | ' + (d.recipe || '') + ' | ' + (d.elapsed_s || 0) + 's' },\n  { payload: (d.message || '') + warn }\n];",
+    "outputs": 5,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 310,
+    "y": 100,
+    "wires": [
+      [
+        "chWeight"
+      ],
+      [
+        "chFlow"
+      ],
+      [
+        "gTemp"
+      ],
+      [
+        "txState"
+      ],
+      [
+        "txMsg"
+      ]
+    ]
+  },
+  {
+    "id": "chWeight",
+    "type": "ui-chart",
+    "z": "tab1",
+    "group": "ui_grp_coffee_chart",
+    "name": "Tổng khối lượng (g)",
+    "label": "Tổng khối lượng nước chiết xuất (g)",
+    "order": 1,
+    "chartType": "line",
+    "category": "",
+    "categoryType": "none",
+    "xAxisLabel": "",
+    "xAxisProperty": "",
+    "xAxisPropertyType": "timestamp",
+    "xAxisType": "time",
+    "xAxisFormat": "",
+    "xAxisFormatType": "auto",
+    "xmin": "",
+    "xmax": "",
+    "yAxisLabel": "g",
+    "yAxisProperty": "payload",
+    "yAxisPropertyType": "msg",
+    "ymin": "0",
+    "ymax": "300",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": "1",
+    "showLegend": true,
+    "removeOlder": "5",
+    "removeOlderUnit": "60",
+    "removeOlderPoints": "",
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e"
+    ],
+    "width": 8,
+    "height": 4,
+    "className": "",
+    "interpolation": "linear",
+    "x": 590,
+    "y": 60,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "chFlow",
+    "type": "ui-chart",
+    "z": "tab1",
+    "group": "ui_grp_coffee_chart",
+    "name": "Tốc độ dòng chảy (g/s)",
+    "label": "Tốc độ dòng chảy tức thời (g/s)",
+    "order": 2,
+    "chartType": "line",
+    "category": "",
+    "categoryType": "none",
+    "xAxisLabel": "",
+    "xAxisProperty": "",
+    "xAxisPropertyType": "timestamp",
+    "xAxisType": "time",
+    "xAxisFormat": "",
+    "xAxisFormatType": "auto",
+    "xmin": "",
+    "xmax": "",
+    "yAxisLabel": "g/s",
+    "yAxisProperty": "payload",
+    "yAxisPropertyType": "msg",
+    "ymin": "0",
+    "ymax": "6",
+    "action": "append",
+    "stackSeries": false,
+    "pointShape": "circle",
+    "pointRadius": "1",
+    "showLegend": true,
+    "removeOlder": "5",
+    "removeOlderUnit": "60",
+    "removeOlderPoints": "",
+    "colors": [
+      "#ff7f0e",
+      "#2ca02c",
+      "#d62728"
+    ],
+    "width": 8,
+    "height": 4,
+    "className": "",
+    "interpolation": "linear",
+    "x": 590,
+    "y": 120,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "gTemp",
+    "type": "ui-gauge",
+    "z": "tab1",
+    "name": "Nhiệt độ nước",
+    "group": "ui_grp_coffee_stat",
+    "order": 1,
+    "value": "payload",
+    "valueType": "msg",
+    "width": 4,
+    "height": 3,
+    "gtype": "gauge-half",
+    "gstyle": "needle",
+    "title": "Nhiệt độ nước bình đun",
+    "alwaysShowTitle": false,
+    "floatingTitlePosition": "top-left",
+    "units": "°C",
+    "icon": "",
+    "prefix": "",
+    "suffix": "",
+    "segments": [
+      {
+        "from": "0",
+        "color": "#2196f3",
+        "text": "Nguội",
+        "textType": "label"
+      },
+      {
+        "from": "88",
+        "color": "#4caf50",
+        "text": "Chuẩn",
+        "textType": "label"
+      },
+      {
+        "from": "95",
+        "color": "#f44336",
+        "text": "Quá nóng",
+        "textType": "label"
+      }
+    ],
+    "min": 0,
+    "max": 100,
+    "sizeThickness": 16,
+    "sizeGap": 4,
+    "sizeKeyThickness": 8,
+    "styleRounded": true,
+    "styleGlow": false,
+    "className": "",
+    "x": 590,
+    "y": 180,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "txState",
+    "type": "ui-text",
+    "z": "tab1",
+    "group": "ui_grp_coffee_stat",
+    "order": 2,
+    "width": 4,
+    "height": 2,
+    "name": "Trạng thái",
+    "label": "Giai đoạn pha:",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": true,
+    "font": "Arial,Arial,Helvetica,sans-serif",
+    "fontSize": "18",
+    "color": "#1976d2",
+    "wrapText": false,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 590,
+    "y": 240,
+    "wires": []
+  },
+  {
+    "id": "txMsg",
+    "type": "ui-text",
+    "z": "tab1",
+    "group": "ui_grp_coffee_stat",
+    "order": 3,
+    "width": 4,
+    "height": 2,
+    "name": "Thông báo",
+    "label": "Thông báo:",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "style": true,
+    "font": "Arial,Arial,Helvetica,sans-serif",
+    "fontSize": "16",
+    "color": "#e65100",
+    "wrapText": false,
+    "className": "",
+    "value": "payload",
+    "valueType": "msg",
+    "x": 590,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "ddRecipe",
+    "type": "ui-dropdown",
+    "z": "tab1",
+    "group": "ui_grp_coffee_ctl",
+    "name": "Chọn công thức",
+    "label": "Công thức pha:",
+    "tooltip": "Chọn công thức pha cà phê",
+    "order": 1,
+    "width": 4,
+    "height": 1,
+    "passthru": true,
+    "multiple": false,
+    "chips": false,
+    "clearable": false,
+    "options": [
+      {
+        "value": "Classic_PourOver",
+        "label": "V60 Pour-Over (15g - 1:15)"
+      },
+      {
+        "value": "Vietnamese_Phin",
+        "label": "Phin Đậm Đà (20g - 1:10)"
+      },
+      {
+        "value": "Night_Shift",
+        "label": "Ca Đêm Tỉnh Táo (18g - 1:12)"
+      }
+    ],
+    "payload": "",
+    "topic": "topic",
+    "topicType": "msg",
+    "className": "",
+    "x": 140,
+    "y": 260,
+    "wires": [
+      [
+        "fnRecipe"
+      ]
+    ]
+  },
+  {
+    "id": "fnRecipe",
+    "type": "function",
+    "z": "tab1",
+    "name": "Store recipe",
+    "func": "flow.set(\"selected_recipe\", msg.payload);\nreturn null;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 340,
+    "y": 260,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "btnStart",
+    "type": "ui-button",
+    "z": "tab1",
+    "group": "ui_grp_coffee_ctl",
+    "name": "Start",
+    "label": "▶ BẮT ĐẦU PHA (START)",
+    "order": 2,
+    "width": 4,
+    "height": 1,
+    "emulateClick": false,
+    "tooltip": "",
+    "color": "#ffffff",
+    "bgcolor": "#2e7d32",
+    "className": "",
+    "icon": "mdi-play",
+    "iconPosition": "left",
+    "payload": "start",
+    "payloadType": "str",
+    "topic": "topic",
+    "topicType": "msg",
+    "x": 140,
+    "y": 320,
+    "wires": [
+      [
+        "fnStart"
+      ]
+    ]
+  },
+  {
+    "id": "fnStart",
+    "type": "function",
+    "z": "tab1",
+    "name": "Build START_BREW",
+    "func": "const r = flow.get(\"selected_recipe\") || \"Classic_PourOver\";\nlet cmd = { action: \"START_BREW\", recipe_name: r, coffee_dose_g: 15.0, ratio: 15.0, bloom_water_g: 30.0, bloom_time_s: 35 };\nif (r === \"Vietnamese_Phin\") {\n  cmd = { action: \"START_BREW\", recipe_name: \"Vietnamese_Phin\", coffee_dose_g: 20.0, ratio: 10.0, bloom_water_g: 40.0, bloom_time_s: 35 };\n} else if (r === \"Night_Shift\") {\n  cmd = { action: \"START_BREW\", recipe_name: \"Night_Shift\", coffee_dose_g: 18.0, ratio: 12.0, bloom_water_g: 36.0, bloom_time_s: 40 };\n}\nreturn { payload: cmd };",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 370,
+    "y": 320,
+    "wires": [
+      [
+        "mqttOut"
+      ]
+    ]
+  },
+  {
+    "id": "btnStop",
+    "type": "ui-button",
+    "z": "tab1",
+    "group": "ui_grp_coffee_ctl",
+    "name": "Stop",
+    "label": "⏹ DỪNG KHẨN CẤP (STOP)",
+    "order": 3,
+    "width": 4,
+    "height": 1,
+    "emulateClick": false,
+    "tooltip": "",
+    "color": "#ffffff",
+    "bgcolor": "#c62828",
+    "className": "",
+    "icon": "mdi-stop",
+    "iconPosition": "left",
+    "payload": "stop",
+    "payloadType": "str",
+    "topic": "topic",
+    "topicType": "msg",
+    "x": 140,
+    "y": 380,
+    "wires": [
+      [
+        "fnStop"
+      ]
+    ]
+  },
+  {
+    "id": "fnStop",
+    "type": "function",
+    "z": "tab1",
+    "name": "STOP",
+    "func": "return { payload: { action: \"STOP\" } };",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 340,
+    "y": 380,
+    "wires": [
+      [
+        "mqttOut"
+      ]
+    ]
+  },
+  {
+    "id": "btnTare",
+    "type": "ui-button",
+    "z": "tab1",
+    "group": "ui_grp_coffee_ctl",
+    "name": "Tare",
+    "label": "⚖ TRỪ BÌ CÂN (TARE)",
+    "order": 4,
+    "width": 4,
+    "height": 1,
+    "emulateClick": false,
+    "tooltip": "",
+    "color": "#ffffff",
+    "bgcolor": "#1565c0",
+    "className": "",
+    "icon": "mdi-scale",
+    "iconPosition": "left",
+    "payload": "tare",
+    "payloadType": "str",
+    "topic": "topic",
+    "topicType": "msg",
+    "x": 140,
+    "y": 440,
+    "wires": [
+      [
+        "fnTare"
+      ]
+    ]
+  },
+  {
+    "id": "fnTare",
+    "type": "function",
+    "z": "tab1",
+    "name": "TARE",
+    "func": "return { payload: { action: \"TARE\" } };",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 340,
+    "y": 440,
+    "wires": [
+      [
+        "mqttOut"
+      ]
+    ]
+  },
+  {
+    "id": "mqttOut",
+    "type": "mqtt out",
+    "z": "tab1",
+    "name": "command",
+    "topic": "phy3640/quang/coffee/command",
+    "qos": "0",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "broker",
+    "x": 600,
+    "y": 380,
+    "wires": []
+  }
 ]
