@@ -167,14 +167,19 @@ stateDiagram-v2
 ├── include/config.h        # Cấu hình GPIO (ESP32-S3), Wi-Fi, MQTT
 ├── src/main.cpp            # Firmware: state machine, EMA, flow rate, MQTT
 ├── diagram.json            # Sơ đồ mạch Wokwi (board-esp32-s3-devkitc-1)
-├── wokwi.toml              # Cấu hình nạp firmware Wokwi
-├── nodered/flows.json      # Flow Node-RED + Dashboard
+├── wokwi.toml              # Cấu hình nạp firmware Wokwi (VS Code)
+├── libraries.txt           # Thư viện cho Wokwi
+├── wokwi/                  # Gói chạy độc lập trên Wokwi Web (sketch.ino, diagram.json, libraries.txt)
+├── nodered/flows.json      # Flow Node-RED + Dashboard 2.0
 └── assets/                 # Sơ đồ đấu dây, ảnh phần cứng, ảnh Wokwi
 ```
 
 1. **Build firmware:** `pio run` (hoặc mở thư mục bằng VS Code + PlatformIO).
-2. **Mô phỏng Wokwi:** cài extension *Wokwi for VS Code*, chạy `pio run`, mở `diagram.json` → *Start Simulation*. Kéo thanh trượt trọng lượng của HX711 để mô phỏng nước chảy vào cốc. Trong Wokwi, LED `PUMP` thể hiện độ sáng theo duty PWM của bơm.
-3. **Node-RED:** cài `node-red-dashboard`, *Import* [`nodered/flows.json`](nodered/flows.json), Deploy, mở `http://localhost:1880/ui`.
+2. **Mô phỏng Wokwi:** 
+   - **Cách 1 (Wokwi Web - Không cần cài đặt):** Mở [wokwi.com/projects/new/esp32-s3](https://wokwi.com/projects/new/esp32-s3), copy file [`wokwi/sketch.ino`](wokwi/sketch.ino) vào code editor, copy [`wokwi/diagram.json`](wokwi/diagram.json) vào tab *diagram.json*, và thêm các thư viện trong [`wokwi/libraries.txt`](wokwi/libraries.txt) vào tab *libraries.txt* → bấm nút **Play ▶**.
+   - **Cách 2 (VS Code Extension):** Cài extension *Wokwi for VS Code*, chạy `pio run`, mở `diagram.json` → *Start Simulation*.
+   - *Thao tác mô phỏng:* Kéo thanh trượt gram của cảm biến HX711 để mô phỏng nước rót vào cốc; LED `PUMP` đổi độ sáng theo duty PWM; Servo quay quét góc vòi rót; còi Buzzer phát âm báo khi chuyển giai đoạn.
+3. **Node-RED:** mở Dashboard tại `http://localhost:1880/dashboard/coffee` (hoặc import [`nodered/flows.json`](nodered/flows.json)).
 4. **Đổi topic:** nếu dùng broker công cộng, nên đổi `quang` trong topic thành chuỗi riêng để tránh trùng với người khác (sửa ở `include/config.h` và flow Node-RED).
 
 ### Hiệu chuẩn Loadcell
