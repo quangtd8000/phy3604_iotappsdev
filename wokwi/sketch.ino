@@ -389,12 +389,30 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
   }
 }
 
+void beginWifi() {
+  if (strcmp(WIFI_SSID, "Wokwi-GUEST") == 0) {
+    // Kênh 6 là kênh AP ảo của Wokwi -> bỏ qua quét 13 kênh, kết nối tức thì
+    WiFi.begin(WIFI_SSID, WIFI_PASS, 6);
+  } else {
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  }
+}
+
 void ensureWifi() {
-  if (WiFi.status() == WL_CONNECTED) return;
+  static bool wasConnected = false;
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wasConnected) {
+      wasConnected = true;
+      Serial.printf("\n[WiFi] Da ket noi! IP: %s\n", WiFi.localIP().toString().c_str());
+    }
+    return;
+  }
+  wasConnected = false;
   static uint32_t lastTry = 0;
-  if (millis() - lastTry < 5000) return;
+  if (millis() - lastTry < 15000) return;
   lastTry = millis();
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.printf("[WiFi] Dang ket noi lai %s...\n", WIFI_SSID);
+  beginWifi();
 }
 
 void ensureMqtt() {
@@ -402,18 +420,31 @@ void ensureMqtt() {
   static uint32_t lastTry = 0;
   if (millis() - lastTry < 3000) return;
   lastTry = millis();
-  String cid = "phy3640-coffee-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  String cid = "phy3640-coffee-" + String((uint32_t)ESP.getEfuseMac(), HEX) + "-" + String(random(1000, 9999));
+  Serial.printf("[MQTT] Dang ket noi %s:%d ...\n", MQTT_HOST, MQTT_PORT);
   if (mqtt.connect(cid.c_str(), nullptr, nullptr, TOPIC_STATUS, 0, true, "offline")) {
     mqtt.subscribe(TOPIC_COMMAND);
     mqtt.publish(TOPIC_STATUS, "online", true);
-    Serial.println("[MQTT] connected");
+    Serial.println("[MQTT] Da ket noi broker thanh cong! San sang nhan lenh tu Node-RED.");
+  } else {
+    Serial.printf("[MQTT] Ket noi that bai (rc=%d), thu lai sau 3s\n", mqtt.state());
   }
 }
 
 void publishTelemetry() {
   static uint32_t last = 0;
-  if (!mqtt.connected() || millis() - last < TELEMETRY_PERIOD_MS) return;
+  if (millis() - last < TELEMETRY_PERIOD_MS) return;
   last = millis();
+
+  bool running = state != ST_IDLE && state != ST_DONE && state != ST_ERROR;
+  static uint32_t lastSerialLog = 0;
+  if (running && millis() - lastSerialLog >= 1000) {
+    lastSerialLog = millis();
+    Serial.printf("[BREW] %s | %.1f / %.0f g | flow=%.2f g/s | temp=%.1f C | duty=%d\n",
+                  STATE_NAMES[state], weightG, recipe.targetG(), max(flowGps, 0.0f), waterTempC, pumpDuty);
+  }
+
+  if (!mqtt.connected()) return;
 
   JsonDocument doc;
   doc["state"] = STATE_NAMES[state];
@@ -425,7 +456,6 @@ void publishTelemetry() {
     doc["water_temp_c"] = roundf(waterTempC * 10) / 10;
     doc["temp_ok"] = waterTempC >= TEMP_MIN_C && waterTempC <= TEMP_MAX_C;
   }
-  bool running = state != ST_IDLE && state != ST_DONE && state != ST_ERROR;
   doc["elapsed_s"] = running ? (millis() - brewStartMs) / 1000 : 0;
   doc["servo_angle"] = servoAngle;
   doc["pump_duty"] = pumpDuty;
@@ -436,7 +466,7 @@ void publishTelemetry() {
   mqtt.publish(TOPIC_TELEMETRY, (const uint8_t*)buf, n, false);
 }
 
-// ===================== Nút nhấn =====================
+// ===================== Nút nhấn & Serial =====================
 void handleButtons() {
   static uint32_t lastTare = 0, lastStop = 0;
   if (digitalRead(PIN_BTN_STOP) == LOW && millis() - lastStop > 300) {
@@ -448,7 +478,23 @@ void handleButtons() {
     if (state == ST_IDLE || state == ST_DONE || state == ST_ERROR) {
       tareScale();
       lastMessage = "Tare";
+      Serial.println("[BTN] Tare -> 0.0 g");
     }
+  }
+}
+
+void handleSerial() {
+  if (!Serial.available()) return;
+  String cmd = Serial.readStringUntil('\n');
+  cmd.trim();
+  cmd.toUpperCase();
+  if (cmd == "START") {
+    startBrew();
+  } else if (cmd == "STOP") {
+    abortBrew("Da dung qua Serial");
+  } else if (cmd == "TARE") {
+    tareScale();
+    Serial.println("[SERIAL] Tare -> 0.0 g");
   }
 }
 
@@ -482,14 +528,22 @@ void setup() {
   ds18.begin();
   ds18.setWaitForConversion(false);
 
+  Serial.printf("[WiFi] Dang ket noi %s ", WIFI_SSID);
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  beginWifi();
+  uint32_t t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 6000) {
+    delay(100);
+    Serial.print(".");
+  }
+
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setCallback(onMqtt);
   mqtt.setBufferSize(512);
 
   beep(2);
-  Serial.println("PHY3640 IoT Gravimetric Coffee Brewer (ESP32-S3) - ready");
+  Serial.println("\nPHY3640 IoT Gravimetric Coffee Brewer (ESP32-S3) - ready");
+  Serial.println("-> Bam START tren Node-RED Dashboard (hoac go START vao Serial Monitor) de pha!");
 }
 
 void loop() {
@@ -501,7 +555,9 @@ void loop() {
   updateFlow();
   updateTemperature();
   handleButtons();
+  handleSerial();
   runStateMachine();
   updateBeep();
   publishTelemetry();
+  delay(10);  // nhường CPU cho Wi-Fi/TCP stack & giúp Wokwi mô phỏng đạt ~100% tốc độ
 }
