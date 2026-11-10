@@ -118,11 +118,11 @@ stateDiagram-v2
 ![Wiring diagram](assets/wiring_diagram.svg)
 
 ### Ảnh chụp phần cứng dự kiến & Mô phỏng Wokwi
-<!-- Thêm ảnh thật vào thư mục assets/ rồi bỏ comment các dòng dưới:
+![Wokwi Simulation](assets/wokwi_simulation.jpg)
+<!-- Thêm ảnh chụp linh kiện thực tế vào thư mục assets/ rồi bỏ comment dòng dưới:
 ![Hardware Components](assets/hardware_preview.jpg)
-![Wokwi Simulation](assets/wokwi_simulation.png)
 -->
-*(Ảnh linh kiện thực tế và ảnh chụp mô phỏng Wokwi sẽ được cập nhật trong thư mục [`assets/`](assets/). Sơ đồ mạch Wokwi có sẵn trong [`diagram.json`](diagram.json).)*
+*(Mạch mô phỏng ESP32-S3 chạy trên Wokwi. Sơ đồ mạch có sẵn trong [`diagram.json`](diagram.json).)*
 
 ---
 
@@ -199,7 +199,7 @@ stateDiagram-v2
 
 1. **Mô phỏng trên Wokwi trước khi ráp mạch thật** – ESP32-S3, HX711, DS18B20, Servo, Buzzer đều có sẵn; chế độ `SIMULATION_MODE` mô phỏng luôn phần vật lý của bơm và dòng nước, nên chạy được trọn chu trình pha vòng kín.
 2. **Chống nhiễu Loadcell khi nước rơi:** firmware dùng bộ lọc **EMA** (`EMA_ALPHA = 0.3`) kết hợp cửa sổ trượt 6 mẫu để lấy đạo hàm lưu lượng $\dot m = \frac{m(t)-m(t-\Delta t)}{\Delta t}$, giúp đường cong trên Node-RED mượt như cân thương mại.
-3. **Khung in 3D trên Anycubic Kobra 2 Neo – chống trôi điểm 0 do nhiệt (thermal drift):** thêm tấm đế cách nhiệt (PETG/PLA) có khe thoáng khí khoảng 5 mm giữa đáy cốc và bề mặt bắt vít của Loadcell, tránh cốc nóng truyền nhiệt trực tiếp vào thanh nhôm.
+3. **Khung in 3D  – chống trôi điểm 0 do nhiệt (thermal drift):** thêm tấm đế cách nhiệt (PETG/PLA) có khe thoáng khí khoảng 5 mm giữa đáy cốc và bề mặt bắt vít của Loadcell, tránh cốc nóng truyền nhiệt trực tiếp vào thanh nhôm.
 
 ---
 
