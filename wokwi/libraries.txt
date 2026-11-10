@@ -1,7 +1,7 @@
-# Wokwi Libraries Configuration
-bogde/HX711
-paulstoffregen/OneWire
-milesburton/DallasTemperature
+# Wokwi Library Manager
+HX711 Arduino Library
+OneWire
+DallasTemperature
 ESP32Servo
 PubSubClient
 ArduinoJson

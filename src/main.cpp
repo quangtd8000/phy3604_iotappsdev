@@ -37,6 +37,7 @@ OneWire oneWire(PIN_DS18B20);
 DallasTemperature ds18(&oneWire);
 Servo nozzleServo;
 ESP32PWM pumpPwm;
+ESP32PWM buzzerPwm;
 
 // ===================== Biến toàn cục =====================
 State state = ST_IDLE;
@@ -62,15 +63,26 @@ uint8_t histCount = 0, histHead = 0;
 int beepToggles = 0;
 uint32_t lastBeepMs = 0;
 
+#if SIMULATION_MODE
+// Mô hình vật lý đơn giản của bơm: lưu lượng bám theo duty với quán tính bậc nhất
+float simMassG = 0, simFlowGps = 0;
+uint32_t simLastMs = 0;
+#endif
+
 // ===================== Tiện ích =====================
 void beep(int n) { beepToggles = n * 2; }
+
+void buzzer(bool on) {
+  // Phát tone 2 kHz (50% duty) để kêu được cả với buzzer thụ động và buzzer Wokwi
+  buzzerPwm.write(on ? 512 : 0);
+}
 
 void updateBeep() {
   if (beepToggles > 0 && millis() - lastBeepMs >= 120) {
     lastBeepMs = millis();
-    digitalWrite(PIN_BUZZER, beepToggles % 2 == 0 ? HIGH : LOW);
+    buzzer(beepToggles % 2 == 0);
     beepToggles--;
-    if (beepToggles == 0) digitalWrite(PIN_BUZZER, LOW);
+    if (beepToggles == 0) buzzer(false);
   }
 }
 
@@ -101,10 +113,42 @@ void abortBrew(const char* msg) {
 }
 
 // ===================== Cảm biến =====================
+void tareScale() {
+#if SIMULATION_MODE
+  simMassG = 0;
+#else
+  scale.tare(10);
+#endif
+  weightEma = 0;
+  weightG = 0;
+}
+
+#if SIMULATION_MODE
+void updateSimPlant() {
+  uint32_t now = millis();
+  float dt = (now - simLastMs) / 1000.0f;
+  simLastMs = now;
+  if (dt <= 0 || dt > 0.5f) return;
+  float target = pumpDuty > SIM_DEAD_DUTY
+                     ? (pumpDuty - SIM_DEAD_DUTY) * SIM_MAX_FLOW_GPS / (255 - SIM_DEAD_DUTY)
+                     : 0.0f;
+  simFlowGps += (target - simFlowGps) * dt / SIM_PUMP_TAU_S;
+  simMassG += simFlowGps * dt;
+}
+#endif
+
 void readWeight() {
+#if SIMULATION_MODE
+  static uint32_t lastRead = 0;
+  updateSimPlant();
+  if (millis() - lastRead < 100) return;  // giống tốc độ 10 SPS của HX711
+  lastRead = millis();
+  float raw = simMassG + SIM_NOISE_G * (random(-100, 101) / 100.0f);
+#else
   if (!scale.is_ready()) return;
-  weightG = scale.get_units(1);
-  weightEma = EMA_ALPHA * weightG + (1.0f - EMA_ALPHA) * weightEma;
+  float raw = scale.get_units(1);
+#endif
+  weightEma = EMA_ALPHA * raw + (1.0f - EMA_ALPHA) * weightEma;
   weightG = weightEma;
 }
 
@@ -139,7 +183,7 @@ void updateTemperature() {
   }
 }
 
-// ===================== Điều khiển bơm (P-controller theo lưu lượng) =====================
+// ===================== Điều khiển bơm (dạng gia số / velocity-form, tương đương khâu I) =====================
 void controlPump(float remainingG) {
   static uint32_t lastCtl = 0;
   if (millis() - lastCtl < FLOW_SAMPLE_MS) return;
@@ -148,7 +192,7 @@ void controlPump(float remainingG) {
   float desired = TARGET_FLOW_GPS;
   if (remainingG < SLOWDOWN_ZONE_G) desired = max(0.8f, TARGET_FLOW_GPS * remainingG / SLOWDOWN_ZONE_G);
   float err = desired - flowGps;
-  setPump((int)constrain(pumpDuty + FLOW_KP * err, PUMP_DUTY_MIN, PUMP_DUTY_MAX));
+  setPump((int)constrain(pumpDuty + FLOW_KI * err, PUMP_DUTY_MIN, PUMP_DUTY_MAX));
 }
 
 // Kiểm tra bơm chạy mà khối lượng không tăng (hết nước / lệch cốc)
@@ -178,9 +222,7 @@ void startBrew() {
     return;
   }
   setPump(0);
-  scale.tare(10);
-  weightEma = 0;
-  weightG = 0;
+  tareScale();
   resetFlowHistory();
   brewStartMs = millis();
   setState(ST_TARING, "Auto-tare");
@@ -269,9 +311,7 @@ void onMqtt(char* topic, byte* payload, unsigned int len) {
     abortBrew("Da dung boi nguoi dung");
   } else if (action == "TARE") {
     if (state == ST_IDLE || state == ST_DONE || state == ST_ERROR) {
-      scale.tare(10);
-      weightEma = 0;
-      weightG = 0;
+      tareScale();
       lastMessage = "Tare";
     }
   }
@@ -334,9 +374,7 @@ void handleButtons() {
   if (digitalRead(PIN_BTN_TARE) == LOW && millis() - lastTare > 300) {
     lastTare = millis();
     if (state == ST_IDLE || state == ST_DONE || state == ST_ERROR) {
-      scale.tare(10);
-      weightEma = 0;
-      weightG = 0;
+      tareScale();
       lastMessage = "Tare";
     }
   }
@@ -346,21 +384,28 @@ void handleButtons() {
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_BTN_TARE, INPUT_PULLUP);
   pinMode(PIN_BTN_STOP, INPUT_PULLUP);
 
+  // Servo 50 Hz, bơm 1 kHz, buzzer 2 kHz -> cần 3 timer LEDC riêng
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
   nozzleServo.setPeriodHertz(50);
   nozzleServo.attach(PIN_SERVO, 500, 2400);
   nozzleServo.write(servoAngle);
   pumpPwm.attachPin(PIN_PUMP, 1000, 8);
   setPump(0);
+  buzzerPwm.attachPin(PIN_BUZZER, 2000, 10);
+  buzzer(false);
 
   scale.begin(PIN_HX711_DT, PIN_HX711_SCK);
   scale.set_scale(HX711_CAL_FACTOR);
-  scale.tare(10);
+  tareScale();
+#if SIMULATION_MODE
+  simLastMs = millis();
+  Serial.println("[SIM] SIMULATION_MODE = 1: khoi luong nuoc duoc mo phong theo duty bom");
+#endif
 
   ds18.begin();
   ds18.setWaitForConversion(false);

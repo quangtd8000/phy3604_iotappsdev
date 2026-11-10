@@ -7,6 +7,45 @@
     "info": "PHY3640 - IoT Gravimetric Coffee Brewer"
   },
   {
+    "id": "coffee_ui_base",
+    "type": "ui-base",
+    "name": "Coffee Brewer Dashboard",
+    "path": "/dashboard",
+    "appIcon": "",
+    "includeClientData": true,
+    "acceptsClientConfig": [
+      "ui-notification",
+      "ui-control"
+    ],
+    "showPathInSidebar": false,
+    "headerContent": "page",
+    "navigationStyle": "default",
+    "titleBarStyle": "default",
+    "showReconnectNotification": true,
+    "notificationDisplayTime": 1,
+    "showDisconnectNotification": true,
+    "allowInstall": false
+  },
+  {
+    "id": "coffee_ui_theme",
+    "type": "ui-theme",
+    "name": "Coffee Theme",
+    "colors": {
+      "surface": "#ffffff",
+      "primary": "#0094CE",
+      "bgPage": "#eeeeee",
+      "groupBg": "#ffffff",
+      "groupOutline": "#cccccc"
+    },
+    "sizes": {
+      "density": "default",
+      "pagePadding": "12px",
+      "groupGap": "12px",
+      "groupBorderRadius": "4px",
+      "widgetGap": "12px"
+    }
+  },
+  {
     "id": "broker",
     "type": "mqtt-broker",
     "name": "HiveMQ",
@@ -23,11 +62,11 @@
     "id": "ui_page_coffee",
     "type": "ui-page",
     "name": "Máy Pha Cà Phê",
-    "ui": "dd3bfbd23c60daf8",
+    "ui": "coffee_ui_base",
     "path": "/coffee",
     "icon": "coffee",
     "layout": "grid",
-    "theme": "1625fc129d6345ff",
+    "theme": "coffee_ui_theme",
     "breakpoints": [
       {
         "name": "Default",

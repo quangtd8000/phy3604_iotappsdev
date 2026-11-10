@@ -3,47 +3,300 @@
   "author": "PHY3640 - IoT Gravimetric Coffee Brewer",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
-    { "type": "wokwi-hx711", "id": "cell", "top": -150, "left": 200, "attrs": { "type": "5kg" } },
-    { "type": "wokwi-ds18b20", "id": "temp", "top": -140, "left": -140, "attrs": {} },
-    { "type": "wokwi-resistor", "id": "r1", "top": -60, "left": -130, "attrs": { "value": "4700" } },
-    { "type": "wokwi-servo", "id": "servo", "top": 140, "left": 220, "attrs": {} },
-    { "type": "wokwi-buzzer", "id": "bz", "top": 210, "left": -130, "attrs": { "volume": "0.1" } },
-    { "type": "wokwi-led", "id": "ledPump", "top": 230, "left": 60, "attrs": { "color": "blue", "label": "PUMP" } },
-    { "type": "wokwi-resistor", "id": "r2", "top": 290, "left": 40, "attrs": { "value": "220" } },
-    { "type": "wokwi-pushbutton", "id": "btnTare", "top": 100, "left": -150, "attrs": { "color": "green", "label": "TARE" } },
-    { "type": "wokwi-pushbutton", "id": "btnStop", "top": 160, "left": -150, "attrs": { "color": "red", "label": "STOP" } }
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": -0.18,
+      "left": 4.57,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-hx711",
+      "id": "cell",
+      "top": -150,
+      "left": 200,
+      "attrs": {
+        "type": "5kg"
+      }
+    },
+    {
+      "type": "wokwi-ds18b20",
+      "id": "temp",
+      "top": -140,
+      "left": -140,
+      "attrs": {
+        "temperature": "91.5"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": -43.2,
+      "left": -96.55,
+      "rotate": 90,
+      "attrs": {
+        "value": "4700"
+      }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo",
+      "top": 142,
+      "left": 220.8,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": 91.5,
+      "left": -233.1,
+      "rotate": 270,
+      "attrs": {
+        "volume": "0.1"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledPump",
+      "top": 157.4,
+      "left": -80,
+      "rotate": 270,
+      "attrs": {
+        "color": "blue",
+        "label": "PUMP"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 119.15,
+      "left": -76.8,
+      "rotate": 90,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnTare",
+      "top": -22.6,
+      "left": 240,
+      "attrs": {
+        "color": "green",
+        "label": "TARE"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnStop",
+      "top": 63.8,
+      "left": 211.2,
+      "attrs": {
+        "color": "red",
+        "label": "STOP"
+      }
+    }
   ],
   "connections": [
-    [ "esp:TX", "$serialMonitor:RX", "", [] ],
-    [ "esp:RX", "$serialMonitor:TX", "", [] ],
-
-    [ "cell:VCC", "esp:3V3.1", "red", [ "h0" ] ],
-    [ "cell:GND", "esp:GND.2", "black", [ "h0" ] ],
-    [ "cell:DT", "esp:16", "green", [ "h0" ] ],
-    [ "cell:SCK", "esp:17", "orange", [ "h0" ] ],
-
-    [ "temp:VCC", "esp:3V3.1", "red", [ "v0" ] ],
-    [ "temp:GND", "esp:GND.1", "black", [ "v0" ] ],
-    [ "temp:DQ", "esp:4", "yellow", [ "v0" ] ],
-    [ "r1:1", "temp:VCC", "red", [ "v0" ] ],
-    [ "r1:2", "temp:DQ", "yellow", [ "v0" ] ],
-
-    [ "servo:V+", "esp:5V", "red", [ "h0" ] ],
-    [ "servo:GND", "esp:GND.2", "black", [ "h0" ] ],
-    [ "servo:PWM", "esp:5", "blue", [ "h0" ] ],
-
-    [ "bz:1", "esp:GND.1", "black", [ "v0" ] ],
-    [ "bz:2", "esp:7", "purple", [ "v0" ] ],
-
-    [ "ledPump:A", "r2:2", "blue", [ "v0" ] ],
-    [ "r2:1", "esp:6", "blue", [ "v0" ] ],
-    [ "ledPump:C", "esp:GND.1", "black", [ "v0" ] ],
-
-    [ "btnTare:1.l", "esp:1", "green", [ "h0" ] ],
-    [ "btnTare:2.l", "esp:GND.1", "black", [ "h0" ] ],
-    [ "btnStop:1.l", "esp:2", "red", [ "h0" ] ],
-    [ "btnStop:2.l", "esp:GND.1", "black", [ "h0" ] ]
+    [
+      "esp:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "cell:VCC",
+      "esp:3V3.1",
+      "red",
+      [
+        "h-216.6",
+        "v123.98"
+      ]
+    ],
+    [
+      "cell:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "h0"
+      ]
+    ],
+    [
+      "cell:DT",
+      "esp:16",
+      "green",
+      [
+        "h-226.2",
+        "v219.48"
+      ]
+    ],
+    [
+      "cell:SCK",
+      "esp:17",
+      "orange",
+      [
+        "h-235.8",
+        "v219.18"
+      ]
+    ],
+    [
+      "temp:VCC",
+      "esp:3V3.1",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "temp:GND",
+      "esp:GND.1",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "temp:DQ",
+      "esp:4",
+      "yellow",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "r1:1",
+      "temp:VCC",
+      "red",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "r1:2",
+      "temp:DQ",
+      "yellow",
+      [
+        "v66",
+        "h-57.68"
+      ]
+    ],
+    [
+      "servo:V+",
+      "esp:5V",
+      "red",
+      [
+        "h-47.2",
+        "v-7.5",
+        "h-115.2",
+        "v28.8"
+      ]
+    ],
+    [
+      "servo:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "v-7.6",
+        "h-85.6",
+        "v-153.42"
+      ]
+    ],
+    [
+      "servo:PWM",
+      "esp:5",
+      "blue",
+      [
+        "v2.2",
+        "h-104.8",
+        "v-105.6",
+        "h-105.55"
+      ]
+    ],
+    [
+      "bz:2",
+      "esp:7",
+      "purple",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "ledPump:A",
+      "r2:2",
+      "blue",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "r2:1",
+      "esp:6",
+      "blue",
+      [
+        "h-0.55",
+        "v-18.17"
+      ]
+    ],
+    [
+      "ledPump:C",
+      "esp:GND.1",
+      "black",
+      [
+        "v0"
+      ]
+    ],
+    [
+      "btnTare:1.l",
+      "esp:1",
+      "green",
+      [
+        "h-124.8",
+        "v67.2"
+      ]
+    ],
+    [
+      "btnStop:1.l",
+      "esp:2",
+      "red",
+      [
+        "v-9.6",
+        "h-119.77"
+      ]
+    ],
+    [
+      "bz:1",
+      "esp:GND.1",
+      "black",
+      [
+        "h19.2",
+        "v57.6"
+      ]
+    ],
+    [
+      "btnTare:2.l",
+      "esp:GND.2",
+      "black",
+      [
+        "v19.4",
+        "h-144"
+      ]
+    ],
+    [
+      "esp:GND.2",
+      "btnStop:2.l",
+      "black",
+      [
+        "v0",
+        "h38.4",
+        "v67.2"
+      ]
+    ]
   ],
   "dependencies": {}
 }

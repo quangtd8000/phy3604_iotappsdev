@@ -21,7 +21,7 @@ Lấy cảm hứng từ các cân cà phê thông minh đắt đỏ (như Acaia 
 ### Bài toán vật lý
 - **Loadcell (strain gauge) + cầu Wheatstone:** lực làm thanh nhôm biến dạng → điện trở strain gauge thay đổi → cầu Wheatstone cho ra điện áp vi sai cỡ mV → **HX711** (ADC 24-bit, khuếch đại PGA 128) → ESP32-S3.
 - **Lưu lượng khối lượng:** $\dot m = \dfrac{m(t) - m(t-\Delta t)}{\Delta t}$ (g/s), tính trên cửa sổ trượt 6 mẫu (~1 s) sau bộ lọc EMA.
-- **Điều khiển vòng kín:** bộ điều khiển P điều chỉnh duty PWM của bơm để lưu lượng bám theo giá trị đặt $2.5\ \text{g/s}$, giảm tốc khi còn < 15 g để dừng chính xác tại khối lượng mục tiêu.
+- **Điều khiển vòng kín:** bộ điều khiển dạng gia số (velocity-form, tương đương khâu tích phân I) cập nhật duty PWM của bơm mỗi 200 ms theo $u_{k} = u_{k-1} + K_I\,(\dot m_{set} - \dot m_{k})$ với $K_I = 12$, để lưu lượng bám theo giá trị đặt $2.5\ \text{g/s}$; khi còn < 15 g thì giảm dần lưu lượng đặt để dừng chính xác tại khối lượng mục tiêu.
 - **Nhiệt độ:** DS18B20 giám sát nước trong khoảng $88^\circ\text{C} - 94^\circ\text{C}$.
 
 ---
@@ -163,23 +163,29 @@ stateDiagram-v2
 ## 6. Cấu trúc repo & Cách chạy thử
 
 ```
-├── platformio.ini          # PlatformIO (ESP32-S3 DevKitC-1 + thư viện)
-├── include/config.h        # Cấu hình GPIO (ESP32-S3), Wi-Fi, MQTT
-├── src/main.cpp            # Firmware: state machine, EMA, flow rate, MQTT
+├── platformio.ini          # 2 môi trường: esp32-s3-devkitc-1 (phần cứng thật) và wokwi (SIMULATION_MODE=1)
+├── include/config.h        # Cấu hình GPIO (ESP32-S3), Wi-Fi, MQTT, thông số điều khiển & mô phỏng
+├── src/main.cpp            # Firmware: state machine, EMA, flow rate, điều khiển bơm, MQTT
 ├── diagram.json            # Sơ đồ mạch Wokwi (board-esp32-s3-devkitc-1)
-├── wokwi.toml              # Cấu hình nạp firmware Wokwi (VS Code)
-├── libraries.txt           # Thư viện cho Wokwi
-├── wokwi/                  # Gói chạy độc lập trên Wokwi Web (sketch.ino, diagram.json, libraries.txt)
+├── wokwi.toml              # Cấu hình Wokwi for VS Code (dùng firmware env wokwi)
+├── tools/make_wokwi_sketch.py  # Sinh gói wokwi/ từ src/ + include/
+├── wokwi/                  # Gói chạy trên Wokwi Web (tự sinh, không sửa tay)
 ├── nodered/flows.json      # Flow Node-RED + Dashboard 2.0
 └── assets/                 # Sơ đồ đấu dây, ảnh phần cứng, ảnh Wokwi
 ```
 
-1. **Build firmware:** `pio run` (hoặc mở thư mục bằng VS Code + PlatformIO).
-2. **Mô phỏng Wokwi:** 
-   - **Cách 1 (Wokwi Web - Không cần cài đặt):** Mở [wokwi.com/projects/new/esp32-s3](https://wokwi.com/projects/new/esp32-s3), copy file [`wokwi/sketch.ino`](wokwi/sketch.ino) vào code editor, copy [`wokwi/diagram.json`](wokwi/diagram.json) vào tab *diagram.json*, và thêm các thư viện trong [`wokwi/libraries.txt`](wokwi/libraries.txt) vào tab *libraries.txt* → bấm nút **Play ▶**.
-   - **Cách 2 (VS Code Extension):** Cài extension *Wokwi for VS Code*, chạy `pio run`, mở `diagram.json` → *Start Simulation*.
-   - *Thao tác mô phỏng:* Kéo thanh trượt gram của cảm biến HX711 để mô phỏng nước rót vào cốc; LED `PUMP` đổi độ sáng theo duty PWM; Servo quay quét góc vòi rót; còi Buzzer phát âm báo khi chuyển giai đoạn.
-3. **Node-RED:** mở Dashboard tại `http://localhost:1880/dashboard/coffee` (hoặc import [`nodered/flows.json`](nodered/flows.json)).
+1. **Build firmware:**
+   - Phần cứng thật: `pio run -e esp32-s3-devkitc-1` → nạp bằng `pio run -e esp32-s3-devkitc-1 -t upload` (cắm cổng **UART** của DevKitC-1).
+   - Bản mô phỏng: `pio run -e wokwi`.
+2. **Mô phỏng Wokwi** (bật `SIMULATION_MODE`: khối lượng nước tự tăng theo duty bơm qua mô hình quán tính bậc nhất + nhiễu ±0.3 g do giọt nước rơi, nên chu trình pha chạy trọn vẹn mà không cần kéo thanh trượt HX711):
+   - **Cách 1 (Wokwi Web, không cần cài gì):** mở [wokwi.com/projects/new/esp32-s3](https://wokwi.com/projects/new/esp32-s3) rồi copy 3 file trong [`wokwi/`](wokwi/): `sketch.ino` vào tab code, `diagram.json` vào tab *diagram.json*, `libraries.txt` vào tab *libraries.txt* (tạo bằng nút `+` nếu chưa có). Sau đó bấm **Play ▶**.
+   - **Cách 2 (VS Code):** cài extension *Wokwi for VS Code*, chạy `pio run -e wokwi`, mở `diagram.json` rồi chọn *Wokwi: Start Simulator*.
+   - *Khi chạy:* bấm **START** trên Dashboard. LED `PUMP` đổi độ sáng theo duty PWM, Servo quét vòi rót, Buzzer kêu khi hết giai đoạn ủ và khi pha xong. DS18B20 đặt sẵn 91.5 °C; bấm vào cảm biến để đổi nhiệt độ và thử cảnh báo.
+   - *Sửa code:* chỉ sửa trong `src/` và `include/`, sau đó chạy `python tools/make_wokwi_sketch.py` để cập nhật `wokwi/`.
+3. **Node-RED (Dashboard 2.0):**
+   - Cài gói dashboard: menu ☰ → *Manage palette* → *Install* → tìm `@flowfuse/node-red-dashboard` (hoặc chạy `npm install @flowfuse/node-red-dashboard` trong thư mục `~/.node-red`).
+   - Menu ☰ → *Import* → chọn [`nodered/flows.json`](nodered/flows.json) → **Deploy**, rồi mở `http://localhost:1880/dashboard/coffee`.
+   - Dashboard 2.0 chỉ dùng **một** `ui-base`. Nếu máy đã có sẵn một dashboard khác, sau khi import hãy xoá node `Coffee Brewer Dashboard` trong tab *Configuration nodes* và cho trang `Máy Pha Cà Phê` dùng `ui-base` có sẵn.
 4. **Đổi topic:** nếu dùng broker công cộng, nên đổi `quang` trong topic thành chuỗi riêng để tránh trùng với người khác (sửa ở `include/config.h` và flow Node-RED).
 
 ### Hiệu chuẩn Loadcell
@@ -191,7 +197,7 @@ stateDiagram-v2
 
 ## 7. Ba mẹo kỹ thuật áp dụng trong dự án
 
-1. **Mô phỏng 100% trên Wokwi trước khi ráp mạch thật** – ESP32-S3, HX711 (có thanh trượt chỉnh gram), DS18B20, Servo, Buzzer đều có sẵn.
+1. **Mô phỏng trên Wokwi trước khi ráp mạch thật** – ESP32-S3, HX711, DS18B20, Servo, Buzzer đều có sẵn; chế độ `SIMULATION_MODE` mô phỏng luôn phần vật lý của bơm và dòng nước, nên chạy được trọn chu trình pha vòng kín.
 2. **Chống nhiễu Loadcell khi nước rơi:** firmware dùng bộ lọc **EMA** (`EMA_ALPHA = 0.3`) kết hợp cửa sổ trượt 6 mẫu để lấy đạo hàm lưu lượng $\dot m = \frac{m(t)-m(t-\Delta t)}{\Delta t}$, giúp đường cong trên Node-RED mượt như cân thương mại.
 3. **Khung in 3D trên Anycubic Kobra 2 Neo – chống trôi điểm 0 do nhiệt (thermal drift):** thêm tấm đế cách nhiệt (PETG/PLA) có khe thoáng khí khoảng 5 mm giữa đáy cốc và bề mặt bắt vít của Loadcell, tránh cốc nóng truyền nhiệt trực tiếp vào thanh nhôm.
 
